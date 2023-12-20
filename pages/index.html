@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://api.fontshare.com/v2/css?f[]=chillax@1,600,500,300,700,400,200&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js" integrity="sha512-3gJwYpMe3QewGELv8k/BX9vcqhryRdzRMxVfq6ngyWXwo03GFEzjsUm8Q7RZcHPHksttq7/GFoxjCVUjkjvPdw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <title>CARI</title>
+</head>
+<body>
+    
+    <header>
+        <div class="logo">
+            <img src="../img/logo.svg" alt="logo que representa uma mulher com cabelo de coloração esverdeada">
+            <span class="span-logo displayFont">CARI</span>
+        </div>
+        <nav>
+            <ul>
+                <li class="text-button btnFont"><a href="../pages/cadastro.html" >Cadastre-se</a></li>
+                <li class="filled-button btnFont"><a href="../pages/login.html">Entre</a></li>
+                <li class="btn-darkmode">
+                    <div>
+                        <input type="checkbox" class="checkbox" id="chk" onclick="alterarImagem()"/>
+                        <label class="label" for="chk">
+                            <ion-icon name="sunny-outline" class="sun acessibilidade" ></ion-icon>
+                            <ion-icon name="moon-outline" class="moon acessibilidade" ></ion-icon>
+                          <div class="ball"></div>
+                        </label>
+                      </div>
+                </li>
+                <li class="btn-fonte">
+                    <div class="fonte">
+                        <span class="btnFont">Tamanho da Fonte</span>
+                        <div class="btns-fonte">
+                            <button onclick="aumentar()" class="btn aumentar" id="btnAumentarFonte">
+                                <ion-icon name="add-circle-outline" class="icon-btn acessibilidade"></ion-icon>
+                            </button>
+                            <button onclick="diminuir()" class="btn diminuir" id="btnDiminuirFonte">
+                                <ion-icon name="remove-circle-outline" class="icon-btn acessibilidade"></ion-icon>
+                            </button>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    
+
+    <main>
+
+        <section class="intro">
+            
+            <div class="display-text">
+                <span class="displayFont">Gerencie <span class="span-text display displayFont">facilmente</span> seus alimentos e <span class="span-text display displayFont">descubra</span> novas receitas</span>
+                <span class="display2Font">Com a <span class="span-text display2Font">Cari</span> tudo fica mais <span class="span-text display2Font">fácil</span></span>
+                <a href="#vantagens" class="elevated-button ">Saiba mais</a>
+                <div class="img">
+                    <img src="../img/illustration center.svg" alt="desenho de uma mulher realizando compras">
+                </div>
+            </div>
+            
+        </section>
+        <section class="vantagens" id="vantagens">
+            <div class="display-text">
+                <span class="displayFont">Com a <span class="span-text display displayFont">Cari</span> você <span class="span-text display displayFont">pode</span></span>
+            </div>
+            <div class="elipse"></div>
+            <div class="flex-mockup">
+                <div class="box-vantagens">
+                    <div class="vantagem-element">
+                        <div class="icon-vantagem">
+                            <ion-icon name="briefcase-outline" class="acessibilidade"></ion-icon>
+                        </div>
+                        <p class="display3Font"><span class="span-vantagem display3Font">Organizar</span> seus alimentos</p>
+                    </div>
+
+                    <div class="vantagem-element">
+                        <div class="icon-vantagem">
+                            <ion-icon name="search-outline" class="acessibilidade"></ion-icon>
+                        </div>
+                        <p class="display3Font"><span class="span-vantagem display3Font">Encontrar</span> novas receitas</p>
+                    </div>
+
+                    <div class="vantagem-element">
+                        <div class="icon-vantagem">
+                            <ion-icon name="list-outline" class="acessibilidade"></ion-icon>
+                        </div>
+                        <p class="display3Font"><span class="span-vantagem display3Font">Facilitar</span> sua lista de compras</p>
+                    </div>
+                </div>
+                <div class="img-mockup">
+                    <img class="img-celular" src="../img/mockup.svg" alt="celular">
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <footer>
+        <div class="logo">
+            <img src="../img/logo.svg" alt="logo que representa uma mulher com cabelo de coloração esverdeada">
+            <span class="span-logo displayFont">CARI</span>
+        </div>
+    </footer>
+    <script src="../js/script.js"></script>
+    <!-- Vlibras -->
+    <div vw class="enabled">
+        <div vw-access-button class="active"></div>
+        <div vw-plugin-wrapper>
+        <div class="vw-plugin-top-wrapper"></div>
+        </div>
+    </div>
+    <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+    <script>
+        new window.VLibras.Widget('https://vlibras.gov.br/app');
+    </script>
+
+</body>
+</html>
