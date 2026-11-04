@@ -95,8 +95,8 @@ Todas as tabelas usam `id uuid primary key` (default `gen_random_uuid()`, mas o 
 
 **Trigger `items_to_list_when_empty`** (after update em `items`): quando `old.quantity > 0` e `new.quantity = 0`, insere uma entrada na lista (`item_id`, nome, unidade e categoria do item, `quantity` nula, `added_by = coalesce(auth.uid(), new.updated_by)`) com `on conflict do nothing`.
 
-**RPCs** (`security invoker`, exceto quando indicado):
-- `create_household(p_name text) returns uuid`: cria a casa, adiciona o chamador como `owner`, atualiza `last_household_id`.
+**RPCs** (`security invoker`, exceto quando indicado; as `security definer` usam `set search_path = ''` e validam `auth.uid()` explicitamente):
+- `create_household(p_name text) returns uuid` (`security definer`, porque o chamador ainda não é membro e `household_members` não tem policy de insert): cria a casa, adiciona o chamador como `owner`, atualiza `last_household_id`.
 - `create_invite(p_household_id uuid) returns text`: exige owner, revoga o link ativo e cria um novo. Retorna o token.
 - `accept_invite(p_token text) returns uuid` (`security definer`): valida que o token existe, não está revogado nem expirado. Insere o chamador como `member` (idempotente se já for membro) e atualiza `last_household_id`. Erros: `invite_invalid`, `invite_expired`.
 - `finish_shopping(p_household_id uuid, p_entries jsonb) returns int`: `p_entries` é uma lista de `{entry_id, quantity}`, com `quantity > 0`. Tudo numa transação. Para cada entrada marcada:
@@ -105,7 +105,7 @@ Todas as tabelas usam `id uuid primary key` (default `gen_random_uuid()`, mas o 
   - apaga a entrada.
 
   Entradas que não pertencem à casa ou não estão `checked` fazem a função abortar com `entry_invalid`. Retorna o número de itens atualizados no estoque.
-- `leave_household(p_household_id uuid)`: o último owner não pode sair enquanto houver outros membros (`last_owner`). Se o chamador for o único membro, a casa é apagada em cascata.
+- `leave_household(p_household_id uuid)` (`security definer`, para poder apagar a casa quando o chamador é o último membro): o último owner não pode sair enquanto houver outros membros (`last_owner`). Se o chamador for o único membro, a casa é apagada em cascata.
 
 **Seed** (`supabase/seed.sql`): 2 usuários de teste, 1 casa compartilhada entre eles, cerca de 15 itens de estoque e 5 entradas de lista, para desenvolvimento local e E2E.
 
@@ -128,8 +128,8 @@ Todas as tabelas usam `id uuid primary key` (default `gen_random_uuid()`, mas o 
 - Itens agrupados por categoria, na ordem da lista de categorias, e em ordem alfabética dentro de cada grupo.
 - Cada linha mostra nome, quantidade + unidade, botões **−** e **+** e um menu (Editar, Acabou, Remover).
 - **Passo do −/+ por unidade:** `un` = 1, `kg`/`L` = 0,5, `g`/`ml` = 100. Valor mínimo 0.
-- **−** até 0, ou a ação **Acabou**: define `quantity = 0` → o trigger põe o item na lista → aviso "*Leite foi para a lista* · Desfazer" (o desfazer restaura a quantidade anterior e remove a entrada criada).
-- **Remover:** apaga o item; aviso "Removido · Desfazer" (o desfazer reinsere o item com o mesmo id e valores).
+- **−** até 0, ou a ação **Acabou**: define `quantity = 0` → o trigger põe o item na lista → aviso "*Leite foi para a lista* · Desfazer". O desfazer restaura a quantidade anterior e remove a entrada **somente se ela foi criada por essa ação**. Se o item já estava na lista antes, a entrada existente é mantida.
+- **Remover:** apaga o item; aviso "Removido · Desfazer". O desfazer reinsere o item com o mesmo id e valores. Uma entrada da lista ligada a ele, que virou avulsa pelo `on delete set null`, continua avulsa (comportamento aceito).
 - **Adição rápida** (botão "+" flutuante, que abre um painel inferior):
   - campo de nome com autocompletar dos itens da casa;
   - escolher um item existente soma a quantidade digitada;
@@ -215,7 +215,12 @@ public/                  manifest, ícones, ilustrações da Cari
 
 ### PWA
 - Manifest com nome "CARI", cor do tema `#006B5C` e ícones gerados a partir da ilustração da Cari.
-- O Serwist faz precache do shell e dos assets estáticos. Navegações sem rede servem a página do app em cache (os dados vêm do IndexedDB).
+- O Serwist faz precache do shell e dos assets estáticos.
+- **Abrir o app sem sinal** (app fechado, sem rede) é o caso do mercado e precisa funcionar na aba Lista:
+  - a tela da Lista é um Client Component que renderiza **só a partir do cache persistido** do TanStack Query. A carga do servidor é apenas um `initialData` opcional;
+  - a navegação para `/[householdId]/lista` (HTML e requisições RSC) usa estratégia **NetworkFirst** no Serwist, com timeout de 3 s e fallback para a última resposta em cache;
+  - a sessão do Supabase fica no cookie e no storage local; sem rede, o middleware não é alcançado e a página em cache abre normalmente. A sessão é renovada ao voltar a conexão.
+- As demais abas, sem rede e sem cache, mostram a tela offline da Cari.
 
 ### Tratamento de erros
 - Erros de RPC conhecidos (`invite_invalid`, `invite_expired`, `last_owner`, `entry_invalid`) são mapeados para mensagens em pt-BR na voz da Cari.
@@ -281,14 +286,16 @@ Base também para o prompt da IA (subprojeto 2) e do bot (subprojeto 4).
   - RLS: um não membro não lê nem escreve em nenhuma tabela da casa; um membro comum não gerencia convites nem papéis;
   - trigger de "acabou" (cria a entrada e não duplica);
   - `finish_shopping` (soma, cria item avulso, soma em item com mesmo `name_key`, aborta com `entry_invalid`, atomicidade);
-  - `accept_invite` (válido, expirado, revogado, idempotente);
+  - `create_household` por um usuário comum (cria a casa e o torna owner);
+- `accept_invite` (válido, expirado, revogado, idempotente);
   - `leave_household` (`last_owner`, último membro apaga a casa);
   - unicidade de `name_key`.
 - **Vitest:** `lib/units.ts` (passos, formatação pt-BR, quantidade padrão no Finalizar compra), mapeamento de erros e reducers que aplicam eventos realtime no cache.
 - **Playwright** contra o Supabase local (`supabase start`), com sessões semeadas dos 2 usuários de teste:
   1. adicionar item ao estoque, usar −/+ e "Acabou" → item aparece na lista → Desfazer;
   2. dois contextos de navegador na mesma casa: A marca um item e B vê a marcação;
-  3. offline (`context.setOffline(true)`): marcar 2 itens → voltar online → marcações persistidas no banco;
+  3. offline com a página aberta (`context.setOffline(true)`): marcar 2 itens → voltar online → marcações persistidas no banco;
+3b. abrir sem sinal: carregar a Lista → ficar offline → **recarregar a página** → a Lista aparece a partir do cache → marcar 1 item → voltar online → marcação persistida;
   4. finalizar compra → quantidades somadas no estoque e lista limpa;
   5. convite: owner gera o link, segundo usuário aceita e vê a casa;
   6. isolamento: usuário de fora da casa acessa `/[householdId]/lista` e é redirecionado.
@@ -299,7 +306,7 @@ Base também para o prompt da IA (subprojeto 2) e do bot (subprojeto 4).
 - **Deploy:** integração Vercel ↔ GitHub (preview por PR, produção no merge para `main`). As migrations vão para produção num job de `main` com `supabase db push`; os segredos ficam nos secrets do GitHub.
 - **Variáveis:** `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` na Vercel. Nenhuma `service_role` no front. O `.env.example` fica versionado.
 - **Pausa do Supabase gratuito:** projetos sem acesso por 7 dias são pausados. Com uso diário isso não ocorre; como garantia, um workflow agendado semanal faz uma consulta leve ao banco.
-- **Backup:** o plano gratuito não tem backup automático. Um workflow semanal roda `supabase db dump` e guarda o arquivo como artifact privado do GitHub Actions (retenção de 90 dias).
+- **Backup:** o plano gratuito não tem backup automático. Um workflow semanal roda `supabase db dump --data-only` e **criptografa o dump com `age`** antes de enviá-lo. A chave pública fica num secret do repositório; a privada fica só com o Lucas. O arquivo vai como artifact do GitHub Actions (retenção de 90 dias). Como o repositório `lucvs07/CARI` é **público**, qualquer pessoa pode baixar artifacts, e por isso o dump nunca é enviado sem criptografia.
 
 ## 12. Transição do código do TCC
 
