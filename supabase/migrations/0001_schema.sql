@@ -85,13 +85,14 @@ create table public.items (
   updated_by uuid references public.profiles (id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (household_id, name_key)
+  unique (household_id, name_key),
+  unique (household_id, id)
 );
 
 create table public.shopping_list_entries (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null references public.households (id) on delete cascade,
-  item_id uuid references public.items (id) on delete set null,
+  item_id uuid,
   name text not null check (char_length(trim(name)) between 1 and 80),
   quantity numeric(10,3),
   unit public.unit not null,
@@ -102,7 +103,10 @@ create table public.shopping_list_entries (
   checked_by uuid references public.profiles (id) on delete set null,
   added_by uuid references public.profiles (id) on delete set null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- o item ligado precisa ser da mesma casa; só item_id vira nulo ao apagar o item
+  foreign key (household_id, item_id) references public.items (household_id, id)
+    on delete set null (item_id)
 );
 create unique index shopping_list_entries_item_id_key
   on public.shopping_list_entries (item_id) where item_id is not null;

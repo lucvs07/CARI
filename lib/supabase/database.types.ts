@@ -172,11 +172,11 @@ isOneToOne: false
       referencedRelation: "households"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "shopping_list_entries_item_id_fkey"
-      columns: ["item_id"]
+      foreignKeyName: "shopping_list_entries_household_id_item_id_fkey"
+      columns: ["household_id","item_id"]
 isOneToOne: false
       referencedRelation: "items"
-      referencedColumns: ["id"]
+      referencedColumns: ["household_id","id"]
     }
                   ]
                 }
@@ -193,6 +193,9 @@ isOneToOne: false
                            },
 "create_invite":
 { Args: { "p_household_id": string }; Returns: string
+                           },
+"finish_shopping":
+{ Args: { "p_entries": Json,"p_household_id": string }; Returns: number
                            },
 "is_member":
 { Args: { "p_household_id": string }; Returns: boolean
