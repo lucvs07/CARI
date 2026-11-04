@@ -1,6 +1,6 @@
 create extension if not exists pgtap with schema extensions;
 
-begin; select plan(19);
+begin; select plan(32);
 
 -- 1. create_household
 select tests.login_as('intruso@cari.test');
@@ -52,5 +52,33 @@ select tests.login_as('intruso@cari.test');
 select lives_ok($$select public.leave_household((select v::uuid from t_ctx where k = 'own_house'))$$, 'último membro sai');
 select tests.logout();
 select is_empty($$select 1 from public.households where id = (select v::uuid from t_ctx where k = 'own_house')$$, 'casa apagada');
+
+-- 8. invariante last_owner (trigger)
+select tests.logout();
+select tests.reset_fixture();
+select tests.login_as('lucas@cari.test');
+select throws_ok($$delete from household_members where user_id = auth.uid()$$, 'P0001', 'last_owner', 'sole owner não se apaga direto');
+select throws_ok($$update household_members set role = 'member' where user_id = auth.uid()$$, 'P0001', 'last_owner', 'sole owner não se rebaixa');
+select isnt_empty($$update household_members set role = 'owner' where user_id = '00000000-0000-0000-0000-0000000000b2' returning 1$$, 'promove Ana');
+select isnt_empty($$delete from household_members where user_id = auth.uid() returning 1$$, 'com outro owner, Lucas sai');
+select tests.logout();
+select tests.reset_fixture();
+select tests.login_as('lucas@cari.test');
+select isnt_empty($$delete from households where id = '00000000-0000-0000-0000-0000000000a1' returning 1$$, 'owner apaga a casa');
+select tests.logout();
+select is_empty($$select 1 from public.household_members where household_id = '00000000-0000-0000-0000-0000000000a1'$$, 'cascade removeu os membros');
+
+-- 9. privilégios de execução
+create function public.zz_probe() returns int language sql as 'select 1';
+select ok(not has_function_privilege('anon', 'public.zz_probe()', 'execute'), 'função nova: anon sem execute');
+select ok(not exists (select 1 from pg_proc p, aclexplode(p.proacl) a where p.proname = 'zz_probe' and a.grantee = 0), 'função nova: PUBLIC sem execute');
+select ok(not has_function_privilege('anon', 'public.create_household(text)', 'execute'), 'create_household: anon não');
+select ok(not has_function_privilege('anon', 'public.create_invite(uuid)', 'execute'), 'create_invite: anon não');
+select ok(not has_function_privilege('anon', 'public.accept_invite(text)', 'execute'), 'accept_invite: anon não');
+select ok(not has_function_privilege('anon', 'public.leave_household(uuid)', 'execute'), 'leave_household: anon não');
+select ok(has_function_privilege('authenticated', 'public.create_household(text)', 'execute')
+      and has_function_privilege('authenticated', 'public.create_invite(uuid)', 'execute')
+      and has_function_privilege('authenticated', 'public.accept_invite(text)', 'execute')
+      and has_function_privilege('authenticated', 'public.leave_household(uuid)', 'execute'), 'RPCs: authenticated sim');
 
 select * from finish(); rollback;

@@ -1,5 +1,7 @@
 -- RPCs de casa e convite. Futuras funções não ficam executáveis por anon/public por padrão.
-alter default privileges in schema public revoke execute on functions from anon, public;
+-- (o revoke de PUBLIC só vale na forma global; o por-schema não remove o default do PUBLIC)
+alter default privileges revoke execute on functions from public;
+alter default privileges in schema public revoke execute on functions from anon;
 
 create function public.create_household(p_name text)
 returns uuid
@@ -144,3 +146,36 @@ grant execute on function public.create_household(text) to authenticated;
 grant execute on function public.create_invite(uuid) to authenticated;
 grant execute on function public.accept_invite(text) to authenticated;
 grant execute on function public.leave_household(uuid) to authenticated;
+
+-- Invariante: uma casa com outros membros nunca fica sem owner (vale para delete direto e demote).
+create function public.guard_last_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.role = 'owner' and (tg_op = 'DELETE' or new.role <> 'owner') then
+    -- casa já apagada (cascade): nada a proteger
+    if exists (select 1 from public.households where id = old.household_id)
+       and exists (select 1 from public.household_members
+                    where household_id = old.household_id and user_id <> old.user_id)
+       and not exists (select 1 from public.household_members
+                        where household_id = old.household_id and user_id <> old.user_id
+                          and role = 'owner') then
+      raise exception 'last_owner';
+    end if;
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.guard_last_owner() from public, anon;
+
+create trigger guard_last_owner_del before delete on public.household_members
+  for each row execute function public.guard_last_owner();
+create trigger guard_last_owner_upd before update of role on public.household_members
+  for each row execute function public.guard_last_owner();

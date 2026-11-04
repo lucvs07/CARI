@@ -72,6 +72,8 @@ begin
   delete from public.shopping_list_entries where household_id = c_house;
   delete from public.items where household_id = c_house;
   delete from public.household_invites where household_id = c_house;
+  -- members antes dos owners, para não acionar guard_last_owner
+  delete from public.household_members where household_id = c_house and role = 'member';
   delete from public.household_members where household_id = c_house;
 
   insert into public.household_members (household_id, user_id, role) values
@@ -115,3 +117,6 @@ begin
   update public.profiles set last_household_id = null where id not in (c_lucas, c_ana);
 end;
 $$;
+
+-- O default global não dá mais EXECUTE ao PUBLIC (0003): os helpers precisam de grant explícito.
+grant execute on all functions in schema tests to anon, authenticated;
