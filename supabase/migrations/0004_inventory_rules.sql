@@ -51,6 +51,12 @@ begin
     raise exception 'entry_invalid';
   end if;
 
+  -- quantity precisa ser número JSON (string como "NaN" é recusada)
+  if exists (select 1 from jsonb_array_elements(p_entries) as t(e)
+              where jsonb_typeof(e -> 'quantity') is distinct from 'number') then
+    raise exception 'entry_invalid';
+  end if;
+
   begin
     select array_agg((e ->> 'entry_id')::uuid order by ord),
            array_agg((e ->> 'quantity')::numeric order by ord)
@@ -66,7 +72,7 @@ begin
   end if;
 
   if exists (select 1 from unnest(v_ids) as i where i is null)
-     or exists (select 1 from unnest(v_qtys) as q where q is null or q <= 0)
+     or exists (select 1 from unnest(v_qtys) as q where q is null or q = 'NaN' or q <= 0)
      or (select count(distinct i) from unnest(v_ids) as i) <> v_count then
     raise exception 'entry_invalid';
   end if;

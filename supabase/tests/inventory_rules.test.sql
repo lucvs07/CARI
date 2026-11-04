@@ -1,6 +1,6 @@
 create extension if not exists pgtap with schema extensions;
 
-begin; select plan(19);
+begin; select plan(23);
 
 -- fixture de outra casa (como superusuário) para o teste de FK composta
 insert into households (id, name) values ('00000000-0000-0000-0000-0000000000a9', 'Outra casa');
@@ -66,6 +66,15 @@ select is((select count(*)::int from items where name = 'Sal') + (select count(*
 select throws_ok($$select public.finish_shopping('00000000-0000-0000-0000-0000000000a1',
   jsonb_build_array(jsonb_build_object('entry_id', (select v from t_ctx where k = 'sal'), 'quantity', 0)))$$,
   'P0001', 'entry_invalid', 'quantity 0 dá entry_invalid');
+
+-- 6b. NaN
+select throws_ok($$select public.finish_shopping('00000000-0000-0000-0000-0000000000a1',
+  jsonb_build_array(jsonb_build_object('entry_id', (select v from t_ctx where k = 'sal'), 'quantity', 'NaN')))$$,
+  'P0001', 'entry_invalid', 'quantity "NaN" dá entry_invalid');
+select is((select quantity from items where name = 'Leite'), 3.000::numeric, 'Leite intacto');
+select throws_ok($$update items set quantity = 'NaN' where name = 'Leite'$$, '23514', null, 'item não aceita NaN');
+select throws_ok($$insert into shopping_list_entries (household_id, name, quantity, unit)
+  values ('00000000-0000-0000-0000-0000000000a1', 'Nan', 'NaN', 'un')$$, '23514', null, 'entrada não aceita NaN');
 
 -- 7. Intruso não enxerga entradas da casa
 select tests.login_as('intruso@cari.test');

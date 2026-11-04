@@ -77,7 +77,8 @@ create table public.items (
   household_id uuid not null references public.households (id) on delete cascade,
   name text not null check (char_length(trim(name)) between 1 and 80),
   name_key text generated always as (public.normalize_name(name)) stored,
-  quantity numeric(10,3) not null default 0 check (quantity >= 0),
+  quantity numeric(10,3) not null default 0
+    check (quantity >= 0 and quantity <> 'NaN'),
   unit public.unit not null,
   category text not null default 'outros'
     check (category in ('hortifruti', 'carnes', 'laticinios', 'padaria', 'mercearia',
@@ -94,7 +95,8 @@ create table public.shopping_list_entries (
   household_id uuid not null references public.households (id) on delete cascade,
   item_id uuid,
   name text not null check (char_length(trim(name)) between 1 and 80),
-  quantity numeric(10,3),
+  quantity numeric(10,3)
+    check (quantity is null or (quantity >= 0 and quantity <> 'NaN')),
   unit public.unit not null,
   category text not null default 'outros'
     check (category in ('hortifruti', 'carnes', 'laticinios', 'padaria', 'mercearia',
