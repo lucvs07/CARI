@@ -23,6 +23,35 @@ test("loginAs reaproveita a sessão salva no global-setup", async ({ page }) => 
 
 test("sair apaga o cache persistido", async ({ page }) => {
   await loginViaMagicLink(page, "ana@cari.test");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open("keyval-store");
+      req.onupgradeneeded = () => req.result.createObjectStore("keyval");
+      req.onsuccess = () => {
+        const tx = req.result.transaction("keyval", "readwrite");
+        tx.objectStore("keyval").put("x", "cari-query-cache");
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+    const c = await caches.open("cari-lista");
+    await c.put("/x", new Response("x"));
+  });
+  const readKeys = () =>
+    page.evaluate(
+      () =>
+        new Promise<string[]>((r) => {
+          const req = indexedDB.open("keyval-store");
+          req.onsuccess = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("keyval")) return r([]);
+            const g = db.transaction("keyval").objectStore("keyval").getAllKeys();
+            g.onsuccess = () => r(g.result as string[]);
+          };
+        }),
+    );
+  expect(await readKeys()).toContain("cari-query-cache");
+  expect(await page.evaluate(() => caches.has("cari-lista"))).toBe(true);
   await page.getByRole("button", { name: "Menu da conta" }).click();
   await page.getByRole("menuitem", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/login/);

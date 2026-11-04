@@ -16,6 +16,8 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
         getAll: () => request.cookies.getAll(),
         setAll(toSet) {
           toSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          // Os Server Components precisam ver os cookies já renovados.
+          requestHeaders.set("cookie", request.headers.get("cookie") ?? "");
           response = NextResponse.next({ request: { headers: requestHeaders } });
           toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
