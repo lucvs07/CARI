@@ -730,7 +730,7 @@ Comente temporariamente a regra NetworkFirst da Lista em `app/sw.ts` → `npx pl
 `e2e/household.spec.ts`:
 1. Lucas em `/a1/casa` → "Gerar link de convite" → lê a URL do link (input readonly com `aria-label="Link de convite"`).
 2. Outro contexto: Convidado faz `loginAs` e vai até a URL → "Entrar" → URL `/a1/lista` e a casa "Casa Lucas & Ana" no seletor.
-3. Lucas → "Revogar" → Convidado (em outra casa? não; use um link revogado sem ter entrado: gere novo link, revogue, e só então o Convidado abre) abre a URL → `cari.inviteInvalid` visível.
+3. (fixture resetada) Lucas → "Gerar link de convite" → guarda a URL → "Revogar" → Convidado abre essa URL → "Entrar" → `cari.inviteInvalid` visível.
 4. Ana (member) em `/a1/casa` → não vê "Gerar link de convite".
 5. Lucas → "Sair da casa" → confirmar → `cari.lastOwner` visível.
 
