@@ -9,6 +9,9 @@ as $$
 declare
   v_id uuid;
 begin
+  -- permite trocar de usuário sem logout(): volta ao dono antes de consultar auth.users
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
   select id into v_id from auth.users where email = p_email;
   if v_id is null then
     raise exception 'usuário % não existe', p_email;
@@ -49,6 +52,21 @@ begin
   update public.profiles set last_household_id = null
     where last_household_id is distinct from c_house;
   delete from public.households where id <> c_house;
+
+  update public.households
+    set name = 'Casa Lucas & Ana', created_by = c_lucas
+    where id = c_house;
+
+  update public.profiles set avatar_url = null;
+  update public.profiles p set display_name = v.display_name
+    from (values
+      (c_lucas, 'Lucas'),
+      (c_ana, 'Ana'),
+      ('00000000-0000-0000-0000-0000000000b3'::uuid, 'Intruso'),
+      ('00000000-0000-0000-0000-0000000000b4'::uuid, 'Novo'),
+      ('00000000-0000-0000-0000-0000000000b5'::uuid, 'Convidado')
+    ) as v(id, display_name)
+    where p.id = v.id;
 
   -- reseta a1
   delete from public.shopping_list_entries where household_id = c_house;

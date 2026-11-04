@@ -185,7 +185,13 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "normalize_name":
+            "is_member":
+{ Args: { "p_household_id": string }; Returns: boolean
+                           },
+"is_owner":
+{ Args: { "p_household_id": string }; Returns: boolean
+                           },
+"normalize_name":
 { Args: { "": string }; Returns: string
                            }
           }
