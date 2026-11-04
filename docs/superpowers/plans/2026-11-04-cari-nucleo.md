@@ -34,7 +34,7 @@
 2. **Deriva de ponto flutuante no −/+:** 1,5 kg − 0,5 três vezes precisa dar exatamente `0`, e não `-0.0000001` nem `1e-16`; senão o trigger de "acabou" não dispara. → teste em `lib/units.test.ts` (Tarefa 2).
 3. **Finalizar a mesma compra em dois celulares:** a segunda chamada recebe `entry_invalid`; a UI mostra "Alguém da casa já guardou essa compra." e recarrega a lista, sem somar em dobro. → pgTAP na Tarefa 6 e mapeamento de erro na Tarefa 9.
 4. **Nome só com espaços ou com mais de 80 caracteres:** o formulário bloqueia, e o banco rejeita se passar. → pgTAP na Tarefa 3 e teste de schema na Tarefa 10.
-5. **Celular compartilhado na família:** ao sair da conta, o cache persistido (IndexedDB) e a fila de mutações pendentes são apagados, para que a próxima pessoa não veja a casa de outra. → E2E na Tarefa 7.
+5. **Celular compartilhado na família:** ao sair da conta, o cache persistido (IndexedDB), a fila de mutações pendentes e o cache `cari-lista` do service worker são apagados, e a sessão é encerrada só naquele aparelho (`scope: 'local'`), para que a próxima pessoa não veja a casa de outra. → E2E na Tarefa 7.
 
 ---
 
@@ -112,7 +112,7 @@ Instale: `npm i @supabase/supabase-js @supabase/ssr @tanstack/react-query @tanst
 - [ ] **Step 4: Configurar Vitest, Playwright e Supabase**
 
 - `vitest.config.ts`: `environment: 'jsdom'`, `include: ['**/*.test.ts', '**/*.test.tsx']`, `exclude: ['e2e/**', 'node_modules/**']`, alias `@` → raiz.
-- `playwright.config.ts`: `testDir: 'e2e'`, `baseURL: 'http://localhost:3000'`, `webServer: { command: 'npm run build && npm run start', url: 'http://localhost:3000', reuseExistingServer: !process.env.CI, timeout: 180_000 }`, projeto único Chromium com viewport de celular (`devices['Pixel 7']`).
+- `playwright.config.ts`: `testDir: 'e2e'`, `baseURL: 'http://localhost:3000'`, `webServer: { command: 'npm run build && npm run start', url: 'http://localhost:3000', reuseExistingServer: !process.env.CI, timeout: 180_000 }`, projeto único Chromium com viewport de celular (`devices['Pixel 7']`), **`workers: 1` e `fullyParallel: false`** (os testes compartilham o banco local), `globalSetup: './e2e/global-setup.ts'`.
 - `npx supabase init`. No `supabase/config.toml`: `[auth] site_url = "http://localhost:3000"`, `additional_redirect_urls = ["http://localhost:3000/auth/callback"]`; `[auth.email] enable_signup = true`; `[db.seed] sql_paths = ["./seed.sql", "./seeds/test_helpers.sql"]`. O Google OAuth fica configurado só no projeto cloud; localmente, apenas o magic link.
 - `.env.example`: `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` e `NEXT_PUBLIC_SUPABASE_ANON_KEY=` (preencher com a saída de `npx supabase status`).
 - `tsconfig.json`: `"strict": true`.
@@ -212,8 +212,8 @@ Run: `npx vitest run lib/` → PASS
   - checks: `char_length(trim(households.name)) between 1 and 60`; `char_length(trim(items.name)) between 1 and 80`; o mesmo limite em `shopping_list_entries.name`; `category in (...)` nas duas tabelas
   - trigger `on_auth_user_created` em `auth.users` → insere `profiles(id, display_name)` com `coalesce(raw_user_meta_data->>'full_name', split_part(email, '@', 1))`
   - trigger `set_updated_at` (before update) em todas as tabelas com `updated_at`
-  - helpers de teste (só local, via `seeds/test_helpers.sql`): `tests.login_as(p_email text)` (`set local role authenticated` + `set_config('request.jwt.claims', json_build_object('sub', id, 'role', 'authenticated')::text, true)`) e `tests.logout()` (`reset role`)
-  - seed (`seed.sql`): usuários `lucas@cari.test` (Lucas), `ana@cari.test` (Ana) e `intruso@cari.test` (Intruso), com e-mail confirmado e linha em `auth.identities`; casa "Casa Lucas & Ana" com id fixo `00000000-0000-0000-0000-0000000000a1`, Lucas como owner e Ana como member; itens exatamente: Leite 2 L (laticinios), Iogurte 0 un (laticinios), Arroz 0 kg (mercearia), Feijão 1 kg (mercearia), Macarrão 2 un (mercearia), Ovos 6 un (laticinios), Pão de forma 1 un (padaria), Banana 6 un (hortifruti), Tomate 0,5 kg (hortifruti), Frango 1 kg (carnes), Água 6 L (bebidas), Detergente 0 un (limpeza), Sabão em pó 1 un (limpeza), Papel higiênico 4 un (higiene), Pasta de dente 1 un (higiene). Entradas de lista exatamente: Arroz (ligada, 2 kg), Iogurte (ligada, quantidade nula), Detergente (ligada, 1 un), Azeite (avulsa, 1 un, mercearia), Sorvete (avulsa, quantidade nula, congelados); todas `checked = false` e `added_by` = Ana. Não use `Café` nem `Fermento` no seed (os testes os criam). O seed roda como superusuário; insira membros diretamente.
+  - helpers de teste (só local, via `seeds/test_helpers.sql`): `tests.login_as(p_email text)` (`set local role authenticated` + `set_config('request.jwt.claims', json_build_object('sub', id, 'role', 'authenticated')::text, true)`) e `tests.logout()` (`reset role`), mais `tests.reset_fixture()` (`security definer`): restaura itens, entradas, membros e convites da casa a1 para o estado exato do seed e apaga todas as casas que não sejam a a1. Os dados do seed ficam em um só lugar: `seed.sql` chama `select tests.reset_fixture()` depois de criar os usuários
+  - seed (`seed.sql`): usuários `lucas@cari.test` (Lucas), `ana@cari.test` (Ana), `intruso@cari.test` (Intruso: só para testes de isolamento, nunca entra em casa nenhuma nos E2E), `novo@cari.test` (Novo: onboarding) e `convidado@cari.test` (Convidado: aceita convites nos E2E), com e-mail confirmado e linha em `auth.identities`; casa "Casa Lucas & Ana" com id fixo `00000000-0000-0000-0000-0000000000a1`, Lucas como owner e Ana como member; itens exatamente: Leite 2 L (laticinios), Iogurte 0 un (laticinios), Arroz 0 kg (mercearia), Feijão 1 kg (mercearia), Macarrão 2 un (mercearia), Ovos 6 un (laticinios), Pão de forma 1 un (padaria), Banana 6 un (hortifruti), Tomate 0,5 kg (hortifruti), Frango 1 kg (carnes), Água 6 L (bebidas), Detergente 0 un (limpeza), Sabão em pó 1 un (limpeza), Papel higiênico 4 un (higiene), Pasta de dente 1 un (higiene). Entradas de lista exatamente: Arroz (ligada, 2 kg), Iogurte (ligada, quantidade nula), Detergente (ligada, 1 un), Azeite (avulsa, 1 un, mercearia), Sorvete (avulsa, quantidade nula, congelados); todas `checked = false` e `added_by` = Ana. Não use `Café` nem `Fermento` no seed (os testes os criam). O seed roda como superusuário; insira membros diretamente.
 
 - [ ] **Step 1: Escrever o teste pgTAP que falha**
 
@@ -324,7 +324,7 @@ Casos, cada um com `login_as`:
 **Interfaces:**
 - Produces:
   - trigger `items_to_list_when_empty` (spec §5), com `added_by = coalesce(auth.uid(), new.updated_by)`
-  - `finish_shopping(p_household_id uuid, p_entries jsonb) returns int` — invoker; `p_entries = [{"entry_id": uuid, "quantity": number}]`. Semântica na spec §5. Quantidade ≤ 0 → `entry_invalid`
+  - `finish_shopping(p_household_id uuid, p_entries jsonb) returns int` — invoker; `p_entries = [{"entry_id": uuid, "quantity": number}]`. Semântica na spec §5. Quantidade ≤ 0 → `entry_invalid`. A função começa travando as entradas (`select ... from shopping_list_entries where id = any(<ids>) and household_id = p_household_id for update`): uma segunda chamada simultânea espera, não encontra mais as linhas e recebe `entry_invalid`, sem somar em dobro
   - `alter publication supabase_realtime add table public.items, public.shopping_list_entries;`
 
 - [ ] **Step 1: Escrever o teste que falha** (como Ana em a1)
@@ -364,11 +364,14 @@ Casos, cada um com `login_as`:
   - `updateSession(request: NextRequest): Promise<NextResponse>` (lib/supabase/proxy.ts), usado por `proxy.ts` na raiz. No Next 16 o arquivo de middleware se chama `proxy.ts` e exporta `proxy`; se a versão instalada ainda exigir `middleware.ts`, use esse nome. Matcher exclui `_next/static`, `_next/image`, `sw.js`, `manifest.webmanifest`, `cari/` e `offline`.
   - `requireUser(): Promise<User>` (server.ts): redireciona para `/login?next=<path>` se não houver sessão
   - `clearPersistedCache(): Promise<void>` (lib/query/persist.ts): apaga a chave do IndexedDB usada pelo persister (`cari-query-cache`)
-  - `signOut()` no UserMenu: `queryClient.clear()` → `clearPersistedCache()` → `supabase.auth.signOut()` → `router.replace('/login')`
+  - `signOut()` no UserMenu: `queryClient.clear()` → `clearPersistedCache()` → `caches.delete('cari-lista')` (quando `'caches' in window`) → `supabase.auth.signOut({ scope: 'local' })` (não revoga as sessões nos outros aparelhos) → `router.replace('/login')`
   - Login: botões "Entrar com Google" (`signInWithOAuth({ provider: 'google', options: { redirectTo: origin + '/auth/callback?next=...' } })`) e "Receber link por e-mail" (`signInWithOtp`, com `emailRedirectTo` para o callback). Após enviar: "Te mandei um link! Confere seu e-mail."
   - `/auth/callback`: `exchangeCodeForSession(code)` → redirect para `next` (validado como path relativo) ou `/`
   - `app/page.tsx`: lê `profiles.last_household_id`; se a pessoa é membro → `/[id]/lista`; se não, mas tem outra casa → a primeira; sem casa → `/bem-vindo`
-  - `e2e/helpers/auth.ts`: `loginAs(page: Page, email: string): Promise<void>`. Preenche o e-mail em `/login`, busca a última mensagem no Mailpit (`http://127.0.0.1:54324/api/v1/messages` e `/api/v1/message/{ID}`), extrai o link e navega até ele.
+  - `e2e/helpers/auth.ts`: `loginViaMagicLink(page: Page, email: string): Promise<void>`. Preenche o e-mail em `/login`, busca a última mensagem para aquele destinatário no Mailpit (`http://127.0.0.1:54324/api/v1/search?query=to:<email>` e `/api/v1/message/{ID}`), extrai o link e navega até ele.
+  - `e2e/global-setup.ts`: faz `loginViaMagicLink` uma vez para cada usuário do seed e salva `e2e/.auth/<nome>.json` (`storageState`; adicione `e2e/.auth/` ao `.gitignore`).
+  - `loginAs(page: Page, email: string): Promise<void>`: aplica os cookies do `storageState` salvo ao `page.context()` e navega até `/`. Para testes com dois usuários, use `browser.newContext({ storageState: 'e2e/.auth/<nome>.json' })`.
+  - `e2e/helpers/db.ts`: `adminClient()` (supabase-js com a service role local, só nos testes) e `resetFixture()` (`rpc('reset_fixture')` exposto no schema `tests`, ou SQL direto via `psql` na porta 54322). **Todo arquivo `e2e/*.spec.ts` chama `resetFixture()` em `test.beforeEach`.** O `auth.spec.ts` é o único que usa `loginViaMagicLink` diretamente.
 
 - [ ] **Step 1: Escrever os E2E que falham**
 
@@ -393,10 +396,19 @@ test('sair apaga o cache persistido', async ({ page }) => {
       const g = db.transaction('keyval').objectStore('keyval').getAllKeys(); g.onsuccess = () => r(g.result as string[])
     }}))
   expect(keys).not.toContain('cari-query-cache')
+  expect(await page.evaluate(() => caches.has('cari-lista'))).toBe(false)
+})
+test('sair não derruba a sessão em outro aparelho', async ({ browser }) => {
+  const a = await browser.newContext(), b = await browser.newContext()
+  const pa = await a.newPage(), pb = await b.newPage()
+  await loginViaMagicLink(pa, 'ana@cari.test'); await loginViaMagicLink(pb, 'ana@cari.test')
+  await pa.getByRole('button', { name: 'Menu da conta' }).click()
+  await pa.getByRole('menuitem', { name: 'Sair' }).click()
+  await pb.reload(); await expect(pb).toHaveURL(/\/lista/)
 })
 ```
 
-Para a página `/[id]/lista` existir nesta tarefa, crie `app/(app)/[householdId]/lista/page.tsx` mínima (um `<h1>Lista</h1>`), com o UserMenu num header provisório; a Tarefa 8 substitui pelo AppShell.
+Neste arquivo, use `loginViaMagicLink` no lugar de `loginAs`. Para a página `/[id]/lista` existir nesta tarefa, crie `app/(app)/[householdId]/lista/page.tsx` mínima (um `<h1>Lista</h1>`), com o UserMenu num header provisório; a Tarefa 8 substitui pelo AppShell.
 
 - [ ] **Step 2: Rodar e ver falhar** — `npx playwright test e2e/auth.spec.ts` → FAIL
 
@@ -440,6 +452,7 @@ Para a página `/[id]/lista` existir nesta tarefa, crie `app/(app)/[householdId]
   - `AppShell({ householdId, households, user, children })`: header com `HouseholdSwitcher` (troca → `update profiles set last_household_id` + `router.push('/[id]/lista')`) e `UserMenu` (botão com `aria-label="Menu da conta"`: Gerenciar casa, Tema, Sair); `BottomTabs` com links Estoque/Lista/Receitas (altura ≥ 48 px, `aria-current="page"` na ativa).
   - `[householdId]/layout.tsx`: `requireUser()`, busca a casa por id (RLS); se não encontrar → `redirect('/')`.
   - `/bem-vindo`: `CariSays(cari.welcome)` + `CreateHouseholdForm` (nome 1–60, validação zod) → server action `createHousehold(name: string): Promise<{ id: string }>` (em `features/households/actions.ts`, chama a RPC) → `redirect('/[id]/casa?novo=1')`, onde a Tarefa 13 mostra o convite. Até a Tarefa 13 existir, redirecione para `/[id]/lista`.
+  - `features/households/queries.ts`: `useHouseholds(): Household[]` (key `['households']`) e `useMembers(householdId: string): { user_id: string; role: 'owner' | 'member'; display_name: string; avatar_url: string | null }[]` (key `['members', householdId]`, via `household_members` com join em `profiles`).
   - Receitas: `CariSays(cari.recipesSoon)`.
   - Chillax: baixe do Fontshare (`https://www.fontshare.com/fonts/chillax`) os pesos 400/500/600 em woff2 para `public/fonts/chillax/` e carregue com `next/font/local` como `--font-chillax`, aplicada a `body`.
 
@@ -454,12 +467,12 @@ test('plural', () => {
 })
 // e2e/onboarding.spec.ts
 test('usuário sem casa cria a primeira', async ({ page }) => {
-  await loginAs(page, 'intruso@cari.test')
+  await loginAs(page, 'novo@cari.test')
   await expect(page).toHaveURL(/\/bem-vindo/)
   await expect(page.getByText('Oi, eu sou a Cari! Vamos criar sua casa?')).toBeVisible()
-  await page.getByLabel('Nome da casa').fill('Casa do Intruso')
+  await page.getByLabel('Nome da casa').fill('Casa do Novo')
   await page.getByRole('button', { name: 'Criar casa' }).click()
-  await expect(page.getByRole('button', { name: /Casa do Intruso/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Casa do Novo/ })).toBeVisible()
 })
 // e2e/isolation.spec.ts
 test('não membro é redirecionado', async ({ page }) => {
@@ -469,7 +482,6 @@ test('não membro é redirecionado', async ({ page }) => {
 })
 ```
 
-O E2E de onboarding altera o banco: rode `npm run db:reset` antes da suíte. No CI, o job faz reset antes do Playwright.
 
 - [ ] **Step 2: Rodar e ver falhar** — `npx vitest run features/cari && npx playwright test e2e/onboarding.spec.ts e2e/isolation.spec.ts` → FAIL
 
@@ -548,7 +560,7 @@ test.each([
   - `useItems(householdId: string, initial?: Item[])`
   - Mutações (todas otimistas; em erro, reverte e mostra `toast.error(cari[toCariError(e)], { action: { label: 'Tentar de novo', onClick: retry } })`):
     - `useSetItemQuantity()`, variáveis `{ householdId, id, quantity }`: grava valor absoluto
-    - `useMarkEmpty()`, variáveis `{ householdId, item }`: grava `quantity = 0`. Antes, verifica no cache `['list', householdId]` se já existe entrada com `item_id`. Toast `cari.movedToList(item.name)` com Desfazer. O Desfazer restaura a quantidade anterior e, **só se não existia entrada antes**, apaga a entrada com aquele `item_id`
+    - `useMarkEmpty()`, variáveis `{ householdId, item }`: grava `quantity = 0`. Antes de gravar, consulta o banco (`select id from shopping_list_entries where item_id = $id`; o estoque é online-only) para saber se já existia entrada. **Não** use o cache `['list']`, que costuma estar vazio na tela de Estoque. Toast `cari.movedToList(item.name)` com Desfazer. O Desfazer restaura a quantidade anterior e, **só se não existia entrada antes**, apaga a entrada com aquele `item_id`
     - `useRemoveItem()`: delete; toast `cari.removed` com Desfazer, que reinsere a linha original (mesmo `id`)
     - `useUpsertItem()`, variáveis `{ householdId, name, quantity, unit, category, existingId? }`: com `existingId` soma a quantidade; sem ele, insert com `id = crypto.randomUUID()`. Em `duplicateItem`, o QuickAdd mostra "Já existe *Nome* — somar quantidade?" e, ao confirmar, refaz a operação com o `existingId` do item correspondente (busca por `normalize` local: `name.trim().toLowerCase()` sem acentos via `normalize('NFD')`)
   - `InventoryScreen`:
@@ -575,7 +587,9 @@ test('rejeita nome vazio/longo, aceita vírgula', () => {
 
 `e2e/inventory.spec.ts` (Ana, casa a1, após `db:reset`):
 1. Adicionar "Café" 500 g → aparece em "Mercearia" (escolha a categoria no sheet).
-2. Em "Leite" (2 L): clicar "Diminuir Leite" 4 vezes → o toast "Leite foi para a lista" aparece. Abrir a aba Lista → "Leite" presente. Voltar, repetir o cenário depois de um novo reset e clicar "Desfazer" → Leite volta a 0,5 L e some da Lista.
+2. Em "Leite" (2 L): clicar "Diminuir Leite" 4 vezes → o toast "Leite foi para a lista" aparece → abrir a aba Lista → "Leite" presente.
+2b. (fixture resetada) Em "Leite": clicar "Diminuir Leite" 4 vezes → "Desfazer" → Leite volta a 0,5 L e não está na Lista.
+2c. Em "Arroz" (0 kg, que já tem entrada na lista): "Aumentar Arroz" → "Ações de Arroz" → Acabou → Desfazer → a entrada "Arroz" **continua** na Lista (já existia antes).
 3. Ações de "Café" → Remover → Desfazer → "Café" continua visível.
 4. Adicionar "leite" (minúsculo, nome novo) → aparece "Já existe Leite — somar quantidade?" → confirmar → a quantidade do Leite aumenta.
 
@@ -682,9 +696,13 @@ Reutilize `isEntryChecked` de `e2e/helpers/db.ts` (Tarefa 11).
 
 - [ ] **Step 3: Implementar**
 
-- [ ] **Step 4: Rodar e ver passar** — `npm run db:reset && npx playwright test` (suíte inteira) → PASS
+- [ ] **Step 4: Provar que o teste offline detecta a falha**
 
-- [ ] **Step 5: Commit** — `feat: PWA com Lista disponível offline`
+Comente temporariamente a regra NetworkFirst da Lista em `app/sw.ts` → `npx playwright test e2e/pwa.spec.ts -g 'sem sinal'` → **precisa FALHAR** (página offline do navegador ou `/offline` no lugar da Lista). Se passar mesmo assim, o `setOffline` não está bloqueando as requisições do service worker: troque por `page.route('**/*', r => r.abort())` mais `context.setOffline(true)` e repita até falhar. Restaure a regra.
+
+- [ ] **Step 5: Rodar e ver passar** — `npm run db:reset && npx playwright test` (suíte inteira) → PASS
+
+- [ ] **Step 6: Commit** — `feat: PWA com Lista disponível offline`
 
 ---
 
@@ -711,8 +729,8 @@ Reutilize `isEntryChecked` de `e2e/helpers/db.ts` (Tarefa 11).
 
 `e2e/household.spec.ts`:
 1. Lucas em `/a1/casa` → "Gerar link de convite" → lê a URL do link (input readonly com `aria-label="Link de convite"`).
-2. Outro contexto: Intruso faz `loginAs` e vai até a URL → "Entrar" → URL `/a1/lista` e a casa "Casa Lucas & Ana" no seletor.
-3. Lucas → "Revogar" → Intruso abre a URL antiga → `cari.inviteInvalid` visível.
+2. Outro contexto: Convidado faz `loginAs` e vai até a URL → "Entrar" → URL `/a1/lista` e a casa "Casa Lucas & Ana" no seletor.
+3. Lucas → "Revogar" → Convidado (em outra casa? não; use um link revogado sem ter entrado: gere novo link, revogue, e só então o Convidado abre) abre a URL → `cari.inviteInvalid` visível.
 4. Ana (member) em `/a1/casa` → não vê "Gerar link de convite".
 5. Lucas → "Sair da casa" → confirmar → `cari.lastOwner` visível.
 
