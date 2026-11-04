@@ -104,7 +104,7 @@ Todas as tabelas usam `id uuid primary key` (default `gen_random_uuid()`, mas o 
   - sem `item_id`: cria o item (ou soma, se já existir um com o mesmo `name_key`) com nome, unidade e categoria da entrada;
   - apaga a entrada.
 
-  Entradas que não pertencem à casa ou não estão `checked` fazem a função abortar com `entry_invalid`. Retorna o número de itens atualizados no estoque.
+  Entradas que não pertencem à casa ou não estão `checked` fazem a função abortar com `entry_invalid`. Retorna o número de entradas processadas (cada uma atualiza ou cria exatamente um item no estoque).
 - `leave_household(p_household_id uuid)` (`security definer`, para poder apagar a casa quando o chamador é o último membro): o último owner não pode sair enquanto houver outros membros (`last_owner`). Se o chamador for o único membro, a casa é apagada em cascata.
 
 **Seed** (`supabase/seed.sql`): 2 usuários de teste, 1 casa compartilhada entre eles, cerca de 15 itens de estoque e 5 entradas de lista, para desenvolvimento local e E2E.
