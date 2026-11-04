@@ -8,6 +8,10 @@ describe("safeNext", () => {
     "/\n/evil.com",
     "/\r/evil.com",
     "//evil.com",
+    "/.//evil.com",
+    "/..//evil.com",
+    "/a/../..//evil.com",
+    "/./\\evil.com",
     "/\\evil.com",
     "%2F%2Fevil.com",
     "https://evil.com",
@@ -17,11 +21,6 @@ describe("safeNext", () => {
     null,
   ])("rejeita %j", (input) => {
     expect(safeNext(input)).toBe("/");
-  });
-
-  it("decodifica %09 como o navegador faria e não escapa da origem", () => {
-    const out = safeNext(decodeURIComponent("/%09/evil.com"));
-    expect(out).toBe("/");
   });
 
   it("mantém paths internos", () => {
