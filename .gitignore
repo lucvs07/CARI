@@ -47,3 +47,6 @@ next-env.d.ts
 /supabase/.temp/
 /test-results/
 /playwright-report/
+
+# e2e auth state
+/e2e/.auth/
