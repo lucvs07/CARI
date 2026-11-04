@@ -185,11 +185,23 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "is_member":
+            "accept_invite":
+{ Args: { "p_token": string }; Returns: string
+                           },
+"create_household":
+{ Args: { "p_name": string }; Returns: string
+                           },
+"create_invite":
+{ Args: { "p_household_id": string }; Returns: string
+                           },
+"is_member":
 { Args: { "p_household_id": string }; Returns: boolean
                            },
 "is_owner":
 { Args: { "p_household_id": string }; Returns: boolean
+                           },
+"leave_household":
+{ Args: { "p_household_id": string }; Returns: undefined
                            },
 "normalize_name":
 { Args: { "": string }; Returns: string
