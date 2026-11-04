@@ -1,6 +1,6 @@
 create extension if not exists pgtap with schema extensions;
 
-begin; select plan(23);
+begin; select plan(29);
 
 -- anon: nada legível
 set local role anon;
@@ -29,12 +29,18 @@ select is_empty($$update profiles set display_name = 'X' where id = '00000000-00
 select is_empty($$delete from household_members where user_id = '00000000-0000-0000-0000-0000000000b1' returning 1$$, 'member não remove owner');
 select throws_ok($$insert into household_members(household_id,user_id) values ('00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000b3')$$, '42501', null, 'sem insert direto em household_members');
 select throws_ok($$insert into households(name) values ('Nova')$$, '42501', null, 'sem insert direto em households');
+select is_empty($$update households set name = 'X' returning 1$$, 'member não renomeia a casa');
+select is_empty($$delete from households returning 1$$, 'member não apaga a casa');
+select throws_ok($$update profiles set created_at = now()$$, '42501', null, 'profiles: só colunas permitidas');
 select isnt_empty($$delete from household_members where user_id = '00000000-0000-0000-0000-0000000000b2' returning 1$$, 'ana sai da casa (delete próprio)');
 
 -- lucas (owner) remove a Ana: por último
 select tests.logout();
 select tests.reset_fixture();
 select tests.login_as('lucas@cari.test');
+select isnt_empty($$update households set name = 'Casa Nova' returning 1$$, 'owner renomeia a casa');
+select throws_ok($$update household_members set user_id = '00000000-0000-0000-0000-0000000000b3' where user_id = '00000000-0000-0000-0000-0000000000b2'$$, '42501', null, 'owner não reescreve user_id');
+select isnt_empty($$update household_members set role = 'owner' where user_id = '00000000-0000-0000-0000-0000000000b2' returning 1$$, 'owner promove Ana');
 select lives_ok($$insert into household_invites(household_id,token,created_by) values ('00000000-0000-0000-0000-0000000000a1','tok-teste','00000000-0000-0000-0000-0000000000b1')$$, 'owner cria convite');
 select isnt_empty('select * from household_invites', 'owner lê convites');
 select isnt_empty($$delete from household_members where user_id = '00000000-0000-0000-0000-0000000000b2' returning 1$$, 'owner remove a Ana');

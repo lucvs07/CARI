@@ -51,9 +51,9 @@ create policy households_select on public.households
   for select to authenticated using (public.is_member(id));
 create policy households_update on public.households
   for update to authenticated
-  using (public.is_member(id)) with check (public.is_member(id));
+  using (public.is_owner(id)) with check (public.is_owner(id));
 create policy households_delete on public.households
-  for delete to authenticated using (public.is_member(id));
+  for delete to authenticated using (public.is_owner(id));
 
 -- items
 create policy items_select on public.items
@@ -109,3 +109,12 @@ create policy profiles_select on public.profiles
 create policy profiles_update on public.profiles
   for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
+
+-- Grants por coluna: impede reescrever chaves/identidade via UPDATE direto
+-- (ex.: dono trocar user_id e matricular qualquer usuário sem convite).
+revoke update on public.household_members from authenticated;
+grant update (role) on public.household_members to authenticated;
+revoke update on public.households from authenticated;
+grant update (name) on public.households to authenticated;
+revoke update on public.profiles from authenticated;
+grant update (display_name, avatar_url, last_household_id) on public.profiles to authenticated;
