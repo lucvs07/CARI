@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,15 +13,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { clearPersistedCache } from "@/lib/query/persist";
+import { clearPersistedCache, persister } from "@/lib/query/persist";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { ThemeToggle } from "./ThemeToggle";
 
-export async function signOut({ clearQueryCache }: { clearQueryCache?: () => void } = {}) {
-  clearQueryCache?.();
-  await clearPersistedCache();
-  if (typeof window !== "undefined" && "caches" in window) await caches.delete("cari-lista");
-  await getBrowserSupabase().auth.signOut({ scope: "local" });
+type SignOutDeps = {
+  queryClient: Pick<QueryClient, "cancelQueries" | "clear">;
+  navigate: () => void;
+};
+
+/** Ordem importa: encerra a sessão antes de limpar, para nenhum refetch repopular o cache do usuário anterior. */
+export async function signOut({ queryClient, navigate }: SignOutDeps) {
+  try {
+    await getBrowserSupabase().auth.signOut({ scope: "local" });
+  } catch {
+    // segue limpando e saindo mesmo assim
+  } finally {
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await persister.removeClient();
+      await clearPersistedCache();
+      if (typeof window !== "undefined" && "caches" in window) await caches.delete("cari-lista");
+    } catch {
+      // limpeza falhou: nunca bloqueia o logout
+    } finally {
+      queryClient.clear();
+      navigate();
+    }
+  }
 }
 
 export function UserMenu({ householdId, email }: { householdId?: string; email?: string } = {}) {
@@ -29,8 +49,7 @@ export function UserMenu({ householdId, email }: { householdId?: string; email?:
   const queryClient = useQueryClient();
 
   async function handleSignOut() {
-    await signOut({ clearQueryCache: () => queryClient.clear() });
-    router.replace("/login");
+    await signOut({ queryClient, navigate: () => router.replace("/login") });
   }
 
   return (
