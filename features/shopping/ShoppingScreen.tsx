@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,8 @@ import { useCurrentUserId } from "@/features/shell/CurrentUser";
 import { QuantityField } from "@/features/inventory/ItemFields";
 import { useItems } from "@/features/inventory/queries";
 import type { Item } from "@/features/inventory/schema";
+import { HydrationMarker } from "@/features/pwa/HydrationMarker";
+import { rememberLastHousehold } from "@/features/pwa/lastHousehold";
 import { CATEGORY_LABELS } from "@/lib/categories";
 import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
 import { AddEntrySheet } from "./AddEntrySheet";
@@ -29,16 +31,19 @@ const HIGHLIGHT_MS = 2000;
 export function ShoppingScreen({
   householdId,
   initialEntries,
+  initialEntriesAt,
   initialItems,
   initialMembers,
 }: {
   householdId: string;
   initialEntries: Entry[];
+  /** Quando o servidor leu `initialEntries` (ms). */
+  initialEntriesAt: number;
   initialItems: Item[];
   initialMembers: Member[];
 }) {
   const qc = useQueryClient();
-  const { data: entries = [] } = useList(householdId, initialEntries);
+  const { data: entries = [] } = useList(householdId, initialEntries, initialEntriesAt);
   const { data: items = [] } = useItems(householdId, initialItems);
   const { data: members = [] } = useMembers(householdId, initialMembers);
   const online = useOnlineStatus();
@@ -57,6 +62,8 @@ export function ShoppingScreen({
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const networkHintId = useId();
   const cartId = useId();
+
+  useEffect(() => rememberLastHousehold(householdId), [householdId]);
 
   const names = new Map(members.map((m) => [m.user_id, m.display_name]));
   const { toBuy, inCart } = groupEntries(entries);
@@ -126,6 +133,7 @@ export function ShoppingScreen({
 
   return (
     <div className="flex flex-col gap-4 pb-20">
+      <HydrationMarker />
       {entries.length === 0 ? (
         <CariSays
           message={cari.emptyList}

@@ -8,6 +8,7 @@ export const cari = {
     n === 1 ? "Prontinho! Guardei 1 item no estoque." : `Prontinho! Guardei ${n} itens no estoque.`,
   inviteExpired: "Esse convite expirou. Pede um link novo pra quem te chamou?",
   inviteInvalid: "Não encontrei esse convite. Pede um link novo pra quem te chamou?",
+  offlineNoCache: "Estou sem sinal e ainda não tenho essa tela guardada. Abre a Lista — ela funciona offline.",
   offlineQueued: "Sem sinal por aqui — guardo suas marcações e envio quando voltar.",
   finishNeedsNetwork: "Precisa de internet para guardar no estoque",
   alreadyFinished: "Alguém da casa já guardou essa compra.",

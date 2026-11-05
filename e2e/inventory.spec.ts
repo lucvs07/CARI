@@ -1,17 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { loginAs } from "./helpers/auth";
+import { openEstoque } from "./helpers/app";
 import { adminClient, resetFixture } from "./helpers/db";
 
 test.beforeEach(async () => {
   await resetFixture();
 });
-
-async function openEstoque(page: Page) {
-  await loginAs(page, "ana@cari.test");
-  await page.getByRole("link", { name: "Estoque" }).click();
-  await expect(page).toHaveURL(/\/estoque/);
-  await expect(page.getByRole("button", { name: "Diminuir Leite" })).toBeVisible();
-}
 
 async function listEntryNames(): Promise<string[]> {
   const { data, error } = await adminClient().from("shopping_list_entries").select("name");

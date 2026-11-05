@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { MutationObserver, onlineManager, QueryClient } from "@tanstack/react-query";
+import { dehydrate, hydrate, MutationObserver, onlineManager, QueryClient } from "@tanstack/react-query";
 
 // getSession que nunca resolve: simula o refresh do token travado sem rede.
 const hang = () => new Promise<never>(() => {});
@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase/browser", () => ({
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }));
 
-import { registerListMutationDefaults } from "./mutations";
+import { reapplyPausedListWrites, registerListMutationDefaults } from "./mutations";
 import { listKey, listMutationKey, type Entry } from "./model";
 
 const H = "h1";
@@ -74,4 +74,25 @@ test("variables antigas sem userId (persistidas antes) caem para null", async ()
   mutate("setChecked", { householdId: H, id: "azeite", checked: true });
   await flush();
   expect(cached()[0]).toMatchObject({ checked: true, checked_by: null });
+});
+
+test("reabrir: mutações pausadas restauradas reaplicam o patch sobre o cache, na ordem dos toques", async () => {
+  mutate("setChecked", { householdId: H, id: "azeite", checked: true, userId: "u1" });
+  await flush();
+  mutate("setChecked", { householdId: H, id: "azeite", checked: false, userId: "u1" });
+  await flush();
+  mutate("setQuantity", { householdId: H, id: "azeite", quantity: 2 });
+  await flush();
+  const persisted = dehydrate(qc);
+
+  // App reaberto: o servidor (ou o HTML em cache) trouxe a lista sem as marcações da fila.
+  const reopened = new QueryClient();
+  registerListMutationDefaults(reopened);
+  reopened.setQueryData(listKey(H), [{ ...row("azeite"), quantity: null }]);
+  hydrate(reopened, { mutations: persisted.mutations, queries: [] });
+  expect(reopened.getMutationCache().getAll()).toHaveLength(3);
+
+  reapplyPausedListWrites(reopened);
+  expect(reopened.getQueryData<Entry[]>(listKey(H))![0]).toMatchObject({ checked: false, checked_by: null, quantity: 2 });
+  reopened.clear();
 });

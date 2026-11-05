@@ -6,8 +6,23 @@ import { cari } from "@/features/cari/messages";
 import { itemsKey } from "@/features/inventory/queries";
 import { toCariError } from "@/lib/errors";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import type { Unit } from "@/lib/units";
-import { isListWriteKey, listKey, listMutationKey, type Entry, type ListOp } from "./model";
+import {
+  applyListWrite,
+  isListWriteKey,
+  listKey,
+  listMutationKey,
+  patchRemove,
+  patchSetChecked,
+  patchSetQuantity,
+  patchUpsert,
+  type Entry,
+  type ListOp,
+  type ListWriteVars,
+  type RemoveEntryVars,
+  type SetCheckedVars,
+  type SetEntryQuantityVars,
+  type UpsertEntryVars,
+} from "./model";
 
 /*
  * Escritas da lista são offline-safe: os defaults ficam registrados no QueryClient (makeQueryClient)
@@ -16,27 +31,7 @@ import { isListWriteKey, listKey, listMutationKey, type Entry, type ListOp } fro
  * Todas compartilham o scope "list": rodam em série, na ordem dos toques, também ao retomar.
  */
 
-export type EntryInput = {
-  id: string;
-  name: string;
-  unit: Unit;
-  category: string;
-  quantity: number | null;
-  item_id: string | null;
-  /** Só no Desfazer do remover: restaura a linha como estava. */
-  checked?: boolean;
-  added_by?: string | null;
-};
-
-/**
- * `userId` vem de quem chama (sessão conhecida no toque, via useCurrentUserId): nenhuma chamada de
- * auth no onMutate/mutationFn — offline com token vencendo, getSession segura o lock por ~30 s.
- * Mutações persistidas antes deste campo existir não o têm: cai para null.
- */
-export type UpsertEntryVars = { householdId: string; entry: EntryInput; userId?: string | null };
-export type SetCheckedVars = { householdId: string; id: string; checked: boolean; userId?: string | null };
-export type SetEntryQuantityVars = { householdId: string; id: string; quantity: number | null };
-export type RemoveEntryVars = { householdId: string; id: string };
+export type { EntryInput, RemoveEntryVars, SetCheckedVars, SetEntryQuantityVars, UpsertEntryVars } from "./model";
 
 /** Linha como estava antes da escrita (undefined = não existia no cache). */
 type Ctx = { prev: Entry | undefined };
@@ -117,24 +112,9 @@ export function registerListMutationDefaults(qc: QueryClient): void {
       // Item do estoque que outro aparelho já pôs na lista (índice único em item_id): a entrada existe, ok.
       if (error && !(error.code === "23505" && entry.item_id)) throw error;
     },
-    onMutate: ({ householdId, entry, userId }) => {
-      const { checked, added_by, ...fields } = entry;
-      const addedBy = added_by !== undefined ? added_by : (userId ?? null);
+    onMutate: (vars) => {
       const now = new Date().toISOString();
-      return beginOptimistic(qc, householdId, entry.id, (rows) => {
-        const existing = rows.find((r) => r.id === entry.id);
-        if (existing) return rows.map((r) => (r.id === entry.id ? { ...r, ...fields, ...(checked !== undefined ? { checked } : {}) } : r));
-        const row: Entry = {
-          ...fields,
-          household_id: householdId,
-          checked: checked ?? false,
-          checked_by: null,
-          added_by: addedBy,
-          created_at: now,
-          updated_at: now,
-        };
-        return [...rows, row];
-      });
+      return beginOptimistic(qc, vars.householdId, vars.entry.id, (rows) => patchUpsert(rows, vars, now));
     },
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.entry.id, ctx);
@@ -152,10 +132,7 @@ export function registerListMutationDefaults(qc: QueryClient): void {
         .eq("household_id", householdId);
       if (error) throw error;
     },
-    onMutate: ({ householdId, id, checked, userId }) =>
-      beginOptimistic(qc, householdId, id, (rows) =>
-        rows.map((r) => (r.id === id ? { ...r, checked, checked_by: checked ? (userId ?? null) : null } : r)),
-      ),
+    onMutate: (vars) => beginOptimistic(qc, vars.householdId, vars.id, (rows) => patchSetChecked(rows, vars)),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
       failToast(qc, "setChecked", err, vars);
@@ -169,8 +146,7 @@ export function registerListMutationDefaults(qc: QueryClient): void {
       const { error } = await entriesTable().update({ quantity }).eq("id", id).eq("household_id", householdId);
       if (error) throw error;
     },
-    onMutate: ({ householdId, id, quantity }) =>
-      beginOptimistic(qc, householdId, id, (rows) => rows.map((r) => (r.id === id ? { ...r, quantity } : r))),
+    onMutate: (vars) => beginOptimistic(qc, vars.householdId, vars.id, (rows) => patchSetQuantity(rows, vars)),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
       failToast(qc, "setQuantity", err, vars);
@@ -185,13 +161,32 @@ export function registerListMutationDefaults(qc: QueryClient): void {
       const { error } = await entriesTable().delete().eq("id", id).eq("household_id", householdId);
       if (error) throw error;
     },
-    onMutate: ({ householdId, id }) => beginOptimistic(qc, householdId, id, (rows) => rows.filter((r) => r.id !== id)),
+    onMutate: (vars) => beginOptimistic(qc, vars.householdId, vars.id, (rows) => patchRemove(rows, vars)),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
       failToast(qc, "remove", err, vars);
     },
     onSettled: (_d, _e, { householdId }) => settle(qc, householdId),
   });
+}
+
+/**
+ * Mutações pausadas restauradas do IndexedDB não passam pelo onMutate, e o cache restaurado (ou o
+ * initialData do servidor) pode não ter o patch delas. Reaplica, na ordem dos toques, antes de retomar.
+ */
+export function reapplyPausedListWrites(qc: QueryClient): void {
+  const now = new Date().toISOString();
+  const paused = qc
+    .getMutationCache()
+    .getAll()
+    .filter((m) => m.state.isPaused && isListWriteKey(m.options.mutationKey))
+    .sort((a, b) => a.state.submittedAt - b.state.submittedAt);
+  for (const m of paused) {
+    const op = m.options.mutationKey![1] as ListOp;
+    const vars = m.state.variables as ListWriteVars[ListOp] | undefined;
+    if (!vars?.householdId) continue;
+    patchList(qc, vars.householdId, (rows) => applyListWrite(op, vars, rows, now));
+  }
 }
 
 export function useUpsertEntry() {

@@ -1,5 +1,6 @@
-import { devices, expect, test, type Browser, type Page } from "@playwright/test";
-import { authStatePath, loginAs } from "./helpers/auth";
+import { devices, expect, test, type Browser } from "@playwright/test";
+import { entry, openLista, waitForHydration } from "./helpers/app";
+import { authStatePath } from "./helpers/auth";
 import { A1, adminClient, isEntryChecked, resetFixture, setEntriesChecked } from "./helpers/db";
 import { waitForRealtimeReady } from "./helpers/realtime";
 
@@ -20,17 +21,6 @@ test.beforeEach(async () => {
   await resetFixture();
 });
 
-/** Linha da lista: o botão inteiro tem o nome da entrada (exato, para não casar "Ações de …"). */
-function entry(page: Page, name: string) {
-  return page.getByRole("button", { name, exact: true });
-}
-
-async function openLista(page: Page, email = "ana@cari.test") {
-  await loginAs(page, email);
-  await page.goto(`/${A1}/lista`);
-  await expect(entry(page, "Arroz")).toBeVisible();
-}
-
 async function lucasPage(browser: Browser) {
   const context = await browser.newContext({
     ...devices["Pixel 7"],
@@ -44,6 +34,7 @@ test("marcação aparece em tempo real para o outro membro", async ({ page, brow
   const lucas = await lucasPage(browser);
   const ready = waitForRealtimeReady(lucas);
   await lucas.goto(`/${A1}/lista`);
+  await waitForHydration(lucas);
   await expect(entry(lucas, "Iogurte")).toHaveAttribute("aria-pressed", "false");
   await ready;
 
@@ -84,6 +75,7 @@ test("compra já finalizada em outro aparelho", async ({ page, browser }) => {
   await setEntriesChecked(["Arroz", "Azeite"], true);
   const lucas = await lucasPage(browser);
   await lucas.goto(`/${A1}/lista`);
+  await waitForHydration(lucas);
   await openLista(page);
 
   await page.getByRole("button", { name: "Finalizar compra (2)" }).click();

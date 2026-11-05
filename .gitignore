@@ -50,3 +50,8 @@ next-env.d.ts
 
 # e2e auth state
 /e2e/.auth/
+
+# service worker gerado pelo `serwist build`
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker-*

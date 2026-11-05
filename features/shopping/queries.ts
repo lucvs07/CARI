@@ -14,10 +14,16 @@ export async function fetchList(householdId: string): Promise<Entry[]> {
 }
 
 /** O cache guarda linhas cruas (o Realtime escreve linhas cruas aqui); agrupar e juntar avatares é na renderização. */
-export function useList(householdId: string, initial?: Entry[]) {
+/**
+ * `initialUpdatedAt`: quando o servidor leu `initial`. Sem ele o initialData valeria "agora" e venceria o
+ * cache persistido na hidratação — e o HTML pode ter vindo do cache do SW (aberto sem sinal), mais velho
+ * que o que o aparelho já sabe.
+ */
+export function useList(householdId: string, initial?: Entry[], initialUpdatedAt?: number) {
   return useQuery({
     queryKey: listKey(householdId),
     queryFn: () => fetchList(householdId),
     initialData: initial,
+    initialDataUpdatedAt: initialUpdatedAt,
   });
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CariSays } from "@/features/cari/CariSays";
 import { cari } from "@/features/cari/messages";
+import { HydrationMarker } from "@/features/pwa/HydrationMarker";
 import { CATEGORIES, CATEGORY_LABELS } from "@/lib/categories";
 import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
 import { EditItemSheet } from "./EditItemSheet";
@@ -32,6 +33,7 @@ export function InventoryScreen({ householdId, initialItems }: { householdId: st
 
   return (
     <div className="flex flex-col gap-4">
+      <HydrationMarker />
       {!online && (
         <p role="status" className="rounded-lg bg-surface-container-low px-3 py-2 text-sm ring-1 ring-border">
           {cari.inventoryOffline}

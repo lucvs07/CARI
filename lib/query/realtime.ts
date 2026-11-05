@@ -18,7 +18,16 @@ export function applyRealtimeEvent<T extends { id: string }>(
   if (next.id === undefined) return rows;
   const i = rows.findIndex((r) => r.id === next.id);
   if (i === -1) return [...rows, next];
+  // Eco atrasado de uma escrita anterior (chega depois do refetch que já trouxe uma mais nova): ignora.
+  if (isOlder(next, rows[i])) return rows;
   return rows.map((r, j) => (j === i ? next : r));
+}
+
+/** `updated_at` (trigger no banco) de `a` é anterior ao de `b`. Sem o campo em algum dos dois, não decide. */
+function isOlder(a: object, b: object): boolean {
+  const ta = Date.parse(String((a as { updated_at?: unknown }).updated_at ?? ""));
+  const tb = Date.parse(String((b as { updated_at?: unknown }).updated_at ?? ""));
+  return Number.isFinite(ta) && Number.isFinite(tb) && ta < tb;
 }
 
 export type PendingMutation = { mutationKey?: readonly unknown[]; variables?: unknown };

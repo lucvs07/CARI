@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { cari } from "@/features/cari/messages";
 import {
+  applyListWrite,
   checkedEntries,
   countPausedListWrites,
   countUnchecked,
@@ -105,4 +106,34 @@ test("toQuantityInput usa vírgula", () => {
   expect(toQuantityInput(0.5)).toBe("0,5");
   expect(toQuantityInput(2)).toBe("2");
   expect(toQuantityInput(1000)).toBe("1000");
+});
+
+describe("patches otimistas da lista", () => {
+  const H = "h";
+  const NOW = "2026-11-04T12:00:00.000Z";
+  const rows = () => [entry("Arroz", "mercearia"), entry("Leite", "laticinios")];
+
+  test("setChecked marca com checked_by e desmarca limpando", () => {
+    const on = applyListWrite("setChecked", { householdId: H, id: "Arroz", checked: true, userId: "u1" }, rows(), NOW);
+    expect(on[0]).toMatchObject({ checked: true, checked_by: "u1" });
+    const off = applyListWrite("setChecked", { householdId: H, id: "Arroz", checked: false, userId: "u1" }, on, NOW);
+    expect(off[0]).toMatchObject({ checked: false, checked_by: null });
+  });
+
+  test("setQuantity e remove mexem só na linha alvo", () => {
+    const q = applyListWrite("setQuantity", { householdId: H, id: "Leite", quantity: 2 }, rows(), NOW);
+    expect(q.map((r) => r.quantity)).toEqual([null, 2]);
+    expect(applyListWrite("remove", { householdId: H, id: "Arroz" }, rows(), NOW).map((r) => r.id)).toEqual(["Leite"]);
+  });
+
+  test("upsert cria a linha nova e, reaplicado, não duplica (idempotente)", () => {
+    const vars = {
+      householdId: H,
+      userId: "u1",
+      entry: { id: "Pilhas", name: "Pilhas", unit: "un" as const, category: "outros", quantity: 4, item_id: null },
+    };
+    const once = applyListWrite("upsert", vars, rows(), NOW);
+    expect(once.find((r) => r.id === "Pilhas")).toMatchObject({ added_by: "u1", checked: false, created_at: NOW });
+    expect(applyListWrite("upsert", vars, once, NOW)).toEqual(once);
+  });
 });

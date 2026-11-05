@@ -1,43 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { loginAs } from "./helpers/auth";
+import { expect, test } from "@playwright/test";
+import { entry, openLista, persistedPausedMutations, waitForHydration } from "./helpers/app";
 import { A1, isEntryChecked, resetFixture } from "./helpers/db";
 
 test.beforeEach(async () => {
   await resetFixture();
 });
-
-function entry(page: Page, name: string) {
-  return page.getByRole("button", { name, exact: true });
-}
-
-async function openLista(page: Page) {
-  await loginAs(page, "ana@cari.test");
-  await page.goto(`/${A1}/lista`);
-  await expect(entry(page, "Arroz")).toBeVisible();
-}
-
-/** Número de mutações pausadas já gravadas pelo persister no IndexedDB (idb-keyval). */
-function persistedPausedMutations(page: Page): Promise<number> {
-  return page.evaluate(
-    () =>
-      new Promise<number>((resolve, reject) => {
-        const open = indexedDB.open("keyval-store");
-        open.onerror = () => reject(open.error);
-        open.onsuccess = () => {
-          const req = open.result.transaction("keyval").objectStore("keyval").get("cari-query-cache");
-          req.onerror = () => reject(req.error);
-          req.onsuccess = () => {
-            const raw = req.result as string | undefined;
-            if (!raw) return resolve(0);
-            const parsed = JSON.parse(raw) as {
-              clientState: { mutations: { state: { isPaused: boolean } }[] };
-            };
-            resolve(parsed.clientState.mutations.filter((m) => m.state.isPaused).length);
-          };
-        };
-      }),
-  );
-}
 
 test("sem sinal: marcações entram na fila e sincronizam ao voltar", async ({ page, context }) => {
   await openLista(page);
@@ -74,6 +41,7 @@ test("mutação persistida é retomada do IndexedDB depois de recarregar", async
   await context.setOffline(false);
   const reopened = await context.newPage();
   await reopened.goto(`/${A1}/lista`);
+  await waitForHydration(reopened);
 
   await expect.poll(() => isEntryChecked("Sorvete")).toBe(true);
   await expect(entry(reopened, "Sorvete")).toHaveAttribute("aria-pressed", "true");

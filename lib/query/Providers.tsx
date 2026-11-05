@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { SerwistProvider } from "@serwist/next/react";
+import { reapplyPausedListWrites } from "@/features/shopping/mutations";
 import { GC_TIME, makeQueryClient } from "./client";
 import { persister } from "./persist";
 
@@ -20,9 +22,15 @@ export function Providers({ children }: { children: ReactNode }) {
           shouldDehydrateQuery: (q) => PERSISTED_KEYS.includes(String(q.queryKey[0])) && q.state.status === "success",
         },
       }}
-      onSuccess={() => void queryClient.resumePausedMutations()}
+      onSuccess={() => {
+        reapplyPausedListWrites(queryClient);
+        void queryClient.resumePausedMutations();
+      }}
     >
-      {children}
+      {/* SW só no build de produção; sem recarregar ao voltar o sinal (a fila do TanStack sincroniza). */}
+      <SerwistProvider swUrl="/sw.js" disable={process.env.NODE_ENV === "development"} reloadOnOnline={false}>
+        {children}
+      </SerwistProvider>
     </PersistQueryClientProvider>
   );
 }
