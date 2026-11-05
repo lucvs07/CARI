@@ -10,11 +10,13 @@ import { cari } from "@/features/cari/messages";
 import { CariSays } from "@/features/cari/CariSays";
 import { CATEGORIES, type Category } from "@/lib/categories";
 import { toCariError } from "@/lib/errors";
+import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { UNITS, type Unit } from "@/lib/units";
 import { QuantityField, UnitCategoryFields } from "./ItemFields";
 import { LAST_CATEGORY, LAST_UNIT, readStored, writeStored } from "./lastChoice";
 import { useUpsertItem } from "./mutations";
+import { InventoryOfflineNotice } from "./OfflineNotice";
 import { itemInputSchema, normalizeName, type Item } from "./schema";
 
 export function QuickAddSheet({
@@ -53,6 +55,7 @@ function QuickAddForm({ householdId, items, onDone }: { householdId: string; ite
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const upsert = useUpsertItem(picked?.id ?? pending?.existing.id);
+  const online = useOnlineStatus();
 
   const query = normalizeName(name);
   const suggestions = picked || !query ? [] : items.filter((i) => normalizeName(i.name).includes(query)).slice(0, 5);
@@ -75,6 +78,7 @@ function QuickAddForm({ householdId, items, onDone }: { householdId: string; ite
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!online) return;
     const parsed = itemInputSchema.safeParse({
       name: picked?.name ?? name,
       quantity,
@@ -111,12 +115,13 @@ function QuickAddForm({ householdId, items, onDone }: { householdId: string; ite
   if (pending) {
     return (
       <div className="flex flex-col gap-3">
+        {!online && <InventoryOfflineNotice />}
         <CariSays
           live
           message={cari.duplicateItem(pending.existing.name)}
           action={
             <div className="flex gap-2">
-              <Button className="h-11" onClick={() => void sum(pending.existing, pending.quantity)}>
+              <Button className="h-11" disabled={!online || upsert.isPending} onClick={() => void sum(pending.existing, pending.quantity)}>
                 Somar
               </Button>
               <Button variant="outline" className="h-11" onClick={() => setPending(null)}>
@@ -165,7 +170,8 @@ function QuickAddForm({ householdId, items, onDone }: { householdId: string; ite
           {error}
         </p>
       )}
-      <Button type="submit" className="h-11" disabled={upsert.isPending}>
+      {!online && <InventoryOfflineNotice />}
+      <Button type="submit" className="h-11" disabled={!online || upsert.isPending}>
         Salvar
       </Button>
     </form>

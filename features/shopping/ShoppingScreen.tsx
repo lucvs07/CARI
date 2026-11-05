@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -19,6 +18,7 @@ import { HydrationMarker } from "@/features/pwa/HydrationMarker";
 import { rememberLastHousehold } from "@/features/pwa/lastHousehold";
 import { CATEGORY_LABELS } from "@/lib/categories";
 import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
+import { undoToast } from "@/lib/undoToast";
 import { AddEntrySheet } from "./AddEntrySheet";
 import { FinishShoppingSheet } from "./FinishShoppingSheet";
 import { checkedEntries, groupEntries, listKey, parseEntryQuantity, toQuantityInput, type Entry } from "./model";
@@ -81,26 +81,22 @@ export function ShoppingScreen({
   function removeEntry(entry: Entry) {
     const row = current(entry);
     remove.mutate({ householdId, id: row.id });
-    toast(cari.removed, {
-      action: {
-        label: "Desfazer",
-        onClick: () =>
-          upsert.mutate({
-            householdId,
-            userId,
-            entry: {
-              id: row.id,
-              name: row.name,
-              unit: row.unit,
-              category: row.category,
-              quantity: row.quantity,
-              item_id: row.item_id,
-              checked: row.checked,
-              added_by: row.added_by,
-            },
-          }),
-      },
-    });
+    undoToast(cari.removed, () =>
+      upsert.mutate({
+        householdId,
+        userId,
+        entry: {
+          id: row.id,
+          name: row.name,
+          unit: row.unit,
+          category: row.category,
+          quantity: row.quantity,
+          item_id: row.item_id,
+          checked: row.checked,
+          added_by: row.added_by,
+        },
+      }),
+    );
   }
 
   function highlight(entryId: string) {

@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import { cari } from "@/features/cari/messages";
 import { toCariError } from "@/lib/errors";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { undoToast } from "@/lib/undoToast";
 import type { Category } from "@/lib/categories";
 import type { Unit } from "@/lib/units";
 import { itemsKey } from "./queries";
 import { MAX_QUANTITY, normalizeName, type Item } from "./schema";
 
-// Estoque é online-only: sem setMutationDefaults, sem retry automático.
+// Estoque é online-only: sem setMutationDefaults, sem retry automático. networkMode "always": sem rede
+// a escrita falha na hora (toast com "Tentar de novo") em vez de pausar numa fila que não é persistida.
 const MUTATION_KEY = ["items", "write"] as const;
 
 /** Escritas do mesmo item rodam em ordem (scope do TanStack v5). */
@@ -65,6 +67,7 @@ export function useSetItemQuantity(itemId?: string) {
   const m = useMutation<void, Error, Vars, Cache>({
     mutationKey: MUTATION_KEY,
     ...itemScope(itemId),
+    networkMode: "always",
     retry: false,
     mutationFn: async ({ householdId, id, quantity }) => {
       const { error } = await getBrowserSupabase()
@@ -92,6 +95,7 @@ export function useMarkEmpty(itemId?: string) {
   const m = useMutation<Result, Error, Vars, Cache>({
     mutationKey: MUTATION_KEY,
     ...itemScope(itemId),
+    networkMode: "always",
     retry: false,
     mutationFn: async ({ householdId, item }) => {
       const supabase = getBrowserSupabase();
@@ -131,12 +135,7 @@ export function useMarkEmpty(itemId?: string) {
     onMutate: ({ householdId, item }) =>
       beginOptimistic(qc, householdId, (rows) => rows.map((r) => (r.id === item.id ? { ...r, quantity: 0 } : r))),
     onSuccess: ({ hadEntry }, { householdId, item }) => {
-      toast(cari.movedToList(item.name), {
-        action: {
-          label: "Desfazer",
-          onClick: () => void undoMarkEmpty(qc, householdId, item, hadEntry),
-        },
-      });
+      undoToast(cari.movedToList(item.name), () => void undoMarkEmpty(qc, householdId, item, hadEntry));
       void qc.invalidateQueries({ queryKey: ["list", householdId] });
     },
     onError: (err, vars, ctx) => {
@@ -194,6 +193,7 @@ export function useRemoveItem(itemId?: string) {
   const m = useMutation<void, Error, Vars, Cache>({
     mutationKey: MUTATION_KEY,
     ...itemScope(itemId),
+    networkMode: "always",
     retry: false,
     mutationFn: async ({ householdId, item }) => {
       const { error } = await getBrowserSupabase()
@@ -205,9 +205,7 @@ export function useRemoveItem(itemId?: string) {
     },
     onMutate: ({ householdId, item }) => beginOptimistic(qc, householdId, (rows) => rows.filter((r) => r.id !== item.id)),
     onSuccess: (_d, { householdId, item }) => {
-      toast(cari.removed, {
-        action: { label: "Desfazer", onClick: () => void undoRemove(qc, householdId, item) },
-      });
+      undoToast(cari.removed, () => void undoRemove(qc, householdId, item));
     },
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, ctx);
@@ -247,6 +245,7 @@ export function useUpsertItem(itemId?: string) {
   const m = useMutation<void, Error, UpsertVars, Cache>({
     mutationKey: MUTATION_KEY,
     ...itemScope(itemId),
+    networkMode: "always",
     retry: false,
     mutationFn: async ({ householdId, name, quantity, unit, category, existingId, id }) => {
       const supabase = getBrowserSupabase();
@@ -324,6 +323,7 @@ export function useUpdateItem(itemId?: string) {
   const m = useMutation<void, Error, UpdateVars, Cache>({
     mutationKey: MUTATION_KEY,
     ...itemScope(itemId),
+    networkMode: "always",
     retry: false,
     mutationFn: async ({ householdId, id, name, quantity, unit, category }) => {
       const { error } = await getBrowserSupabase()

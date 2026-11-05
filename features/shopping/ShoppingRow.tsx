@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useId } from "react";
 import { formatQuantity, type Unit } from "@/lib/units";
 import { initials, type Entry } from "./model";
 
@@ -28,6 +29,9 @@ export function ShoppingRow({
   onEditQuantity: (entry: Entry) => void;
   onRemove: (entry: Entry) => void;
 }) {
+  const quantityId = useId();
+  const addedById = useId();
+  const describedBy = [entry.quantity !== null && quantityId, addedByName !== undefined && addedById].filter(Boolean).join(" ");
   return (
     <li
       id={`entrada-${entry.id}`}
@@ -40,6 +44,9 @@ export function ShoppingRow({
         type="button"
         aria-pressed={entry.checked}
         aria-label={entry.name}
+        // O nome acessível é só o nome (estável para quem navega e para os testes); quantidade e quem
+        // adicionou vão na descrição.
+        aria-describedby={describedBy || undefined}
         onClick={() => onToggle(entry)}
         className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
@@ -56,14 +63,19 @@ export function ShoppingRow({
           {entry.name}
         </span>
         {entry.quantity !== null && (
-          <span className="text-sm text-muted-foreground tabular-nums">
+          <span id={quantityId} className="text-sm text-muted-foreground tabular-nums">
             {formatQuantity(entry.quantity, entry.unit as Unit)}
           </span>
         )}
         {addedByName !== undefined && (
-          <Avatar size="sm" title={addedByName} aria-hidden>
-            <AvatarFallback className="text-[0.625rem]">{initials(addedByName)}</AvatarFallback>
-          </Avatar>
+          <>
+            <Avatar size="sm" title={addedByName} aria-hidden>
+              <AvatarFallback className="text-[0.625rem]">{initials(addedByName)}</AvatarFallback>
+            </Avatar>
+            <span id={addedById} className="sr-only">
+              adicionado por {addedByName}
+            </span>
+          </>
         )}
       </button>
       <DropdownMenu>

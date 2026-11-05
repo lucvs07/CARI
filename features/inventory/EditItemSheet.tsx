@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CATEGORIES, type Category } from "@/lib/categories";
+import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
 import { QuantityField, UnitCategoryFields } from "./ItemFields";
 import { useUpdateItem } from "./mutations";
+import { InventoryOfflineNotice } from "./OfflineNotice";
 import { itemInputSchema, type Item } from "./schema";
 
 export function EditItemSheet({
@@ -34,6 +36,7 @@ export function EditItemSheet({
 
 function EditForm({ item, householdId, onClose }: { item: Item; householdId: string; onClose: () => void }) {
   const update = useUpdateItem(item.id);
+  const online = useOnlineStatus();
   const nameId = useId();
   const [name, setName] = useState(item.name);
   const [quantity, setQuantity] = useState(String(item.quantity).replace(".", ","));
@@ -45,6 +48,7 @@ function EditForm({ item, householdId, onClose }: { item: Item; householdId: str
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!online) return;
     const parsed = itemInputSchema.safeParse({ name, quantity, unit, category });
     if (!parsed.success) return setError(parsed.error.issues[0].message);
     update.mutate({ householdId, id: item.id, ...parsed.data });
@@ -64,7 +68,8 @@ function EditForm({ item, householdId, onClose }: { item: Item; householdId: str
           {error}
         </p>
       )}
-      <Button type="submit" className="h-11">
+      {!online && <InventoryOfflineNotice />}
+      <Button type="submit" className="h-11" disabled={!online}>
         Salvar
       </Button>
     </form>

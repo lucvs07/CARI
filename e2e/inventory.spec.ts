@@ -47,7 +47,7 @@ test("Leite diminuído até 0 vai para a lista", async ({ page }) => {
 test("desfazer devolve Leite a 0,5 L e fora da lista", async ({ page }) => {
   await openEstoque(page);
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Diminuir Leite" }).click();
-  await expect(page.getByText("Leite foi para a lista")).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Leite foi para a lista" })).toBeVisible();
   await page.getByRole("button", { name: "Desfazer" }).click();
   await expect(row(page, "Leite").getByText("0,5 L")).toBeVisible();
   await expect.poll(listEntryNames).not.toContain("Leite");
@@ -103,4 +103,19 @@ test("toques rápidos com latência não perdem passos", async ({ page }) => {
       return data?.quantity;
     })
     .toBe(0.5);
+});
+
+test("sem rede: controles do estoque desabilitados, com aviso", async ({ page, context }) => {
+  await openEstoque(page);
+  await context.setOffline(true);
+
+  await expect(page.getByRole("status").filter({ hasText: "Sem internet: o estoque volta quando o sinal voltar." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Adicionar item" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Diminuir Leite" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Aumentar Leite" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Ações de Leite" })).toBeDisabled();
+
+  await context.setOffline(false);
+  await expect(page.getByRole("button", { name: "Adicionar item" })).toBeEnabled();
+  await expect(page.getByText("Sem internet: o estoque volta quando o sinal voltar.")).toHaveCount(0);
 });

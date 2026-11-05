@@ -28,7 +28,7 @@ function LoginForm() {
       options: { emailRedirectTo: callback() },
     });
     setBusy(false);
-    if (error) setError("Não consegui enviar o link. Tenta de novo.");
+    if (error) setError(cari.loginSendFailed);
     else setSent(true);
   }
 
@@ -37,7 +37,7 @@ function LoginForm() {
       provider: "google",
       options: { redirectTo: callback() },
     });
-    if (error) setError("Não consegui entrar com o Google.");
+    if (error) setError(cari.loginGoogleFailed);
   }
 
   return (

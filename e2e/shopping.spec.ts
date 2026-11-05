@@ -71,8 +71,20 @@ test("finalizar compra guarda no estoque e limpa a lista", async ({ page }) => {
   await expect(row("Azeite").getByText("1 un")).toBeVisible();
 });
 
+/** Quantidade em estoque de Arroz e Azeite (uma linha por nome: a soma não duplica o item). */
+async function stockQuantities(): Promise<Record<string, number>> {
+  const { data, error } = await adminClient()
+    .from("items")
+    .select("name, quantity")
+    .eq("household_id", A1)
+    .in("name", ["Arroz", "Azeite"]);
+  if (error) throw error;
+  return Object.fromEntries(data.map((r) => [r.name, r.quantity]));
+}
+
 test("compra já finalizada em outro aparelho", async ({ page, browser }) => {
   await setEntriesChecked(["Arroz", "Azeite"], true);
+  const arrozBefore = (await stockQuantities()).Arroz;
   const lucas = await lucasPage(browser);
   await lucas.goto(`/${A1}/lista`);
   await waitForHydration(lucas);
@@ -86,6 +98,8 @@ test("compra já finalizada em outro aparelho", async ({ page, browser }) => {
 
   await page.getByRole("dialog").getByRole("button", { name: "Guardar no estoque" }).click();
   await expect(page.getByText("Alguém da casa já guardou essa compra.")).toBeVisible();
+  // Somado uma vez só: Arroz 0 + 2 kg (quantidade pedida na entrada) e Azeite criado com 1 un.
+  expect(await stockQuantities()).toEqual({ Arroz: arrozBefore + 2, Azeite: 1 });
   await lucas.context().close();
 });
 
@@ -110,6 +124,7 @@ test("remover entrada e desfazer", async ({ page }) => {
   await page.getByRole("button", { name: "Ações de Sorvete" }).click();
   await page.getByRole("menuitem", { name: "Remover" }).click();
   await expect(entry(page, "Sorvete")).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "Removido" })).toBeVisible();
   await page.getByRole("button", { name: "Desfazer" }).click();
   await expect(entry(page, "Sorvete")).toBeVisible();
 });
@@ -145,4 +160,10 @@ test("toques offline encadeiam e marcação leva quem marcou", async ({ page, co
   await expect(page.getByText(/aguardando sinal/)).toHaveCount(0);
   await expect.poll(() => isEntryChecked("Azeite")).toBe(true);
   await expect.poll(() => checkedBy("Azeite")).not.toBeNull();
+});
+
+test("linha da lista anuncia quantidade e quem adicionou", async ({ page }) => {
+  await openLista(page);
+  await expect(entry(page, "Arroz")).toHaveAccessibleDescription("2 kg adicionado por Ana");
+  await expect(entry(page, "Sorvete")).toHaveAccessibleDescription("adicionado por Ana");
 });

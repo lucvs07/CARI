@@ -11,6 +11,7 @@ import { CATEGORIES, CATEGORY_LABELS } from "@/lib/categories";
 import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
 import { EditItemSheet } from "./EditItemSheet";
 import { InventoryRow } from "./InventoryRow";
+import { InventoryOfflineNotice } from "./OfflineNotice";
 import { QuickAddSheet } from "./QuickAddSheet";
 import { useItems } from "./queries";
 import { normalizeName, type Item } from "./schema";
@@ -34,17 +35,13 @@ export function InventoryScreen({ householdId, initialItems }: { householdId: st
   return (
     <div className="flex flex-col gap-4">
       <HydrationMarker />
-      {!online && (
-        <p role="status" className="rounded-lg bg-surface-container-low px-3 py-2 text-sm ring-1 ring-border">
-          {cari.inventoryOffline}
-        </p>
-      )}
+      {!online && <InventoryOfflineNotice />}
 
       {items.length === 0 ? (
         <CariSays
           message={cari.emptyInventory}
           action={
-            <Button className="h-11" onClick={() => setAdding(true)}>
+            <Button className="h-11" disabled={!online} onClick={() => setAdding(true)}>
               Adicionar item
             </Button>
           }
@@ -79,6 +76,7 @@ export function InventoryScreen({ householdId, initialItems }: { householdId: st
         size="icon"
         className="fixed right-4 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] z-30 size-14 rounded-full shadow-lg"
         aria-label="Adicionar item"
+        disabled={!online}
         onClick={() => setAdding(true)}
       >
         <PlusIcon className="size-6" aria-hidden />

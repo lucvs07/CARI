@@ -9,7 +9,12 @@ import { useEffect } from "react";
  */
 export function HydrationMarker() {
   useEffect(() => {
-    document.documentElement.dataset.hydrated = "true";
+    const html = document.documentElement;
+    html.dataset.hydrated = "true";
+    // Ao sair da tela (navegação no cliente) a marca some até a próxima tela hidratar.
+    return () => {
+      delete html.dataset.hydrated;
+    };
   }, []);
   return null;
 }
