@@ -31,13 +31,15 @@ jobs:
 
       # O repositório é público: o dump em texto puro nunca pode virar artefato nem log.
       # O dump de dados já inclui auth.users, então o restore não deixa perfis órfãos.
-      # Sessões e refresh tokens ficam de fora: não têm valor num restore e são sensíveis.
+      # Fica de fora o que é efêmero ou sensível e não tem valor num restore: sessões, refresh tokens,
+      # fluxos PKCE, log de auditoria, tokens de uso único e claims de MFA. users/identities ficam.
       - name: Gerar o dump e criptografar
         run: |
           set -euo pipefail
           trap 'rm -f dump.sql' EXIT
           npx supabase db dump --remote="$SUPABASE_DB_URL" --data-only \
-            -x auth.sessions,auth.refresh_tokens -f dump.sql > /dev/null
+            -x auth.sessions,auth.refresh_tokens,auth.flow_state,auth.audit_log_entries,auth.one_time_tokens,auth.mfa_amr_claims \
+            -f dump.sql > /dev/null
           age -r "$BACKUP_AGE_PUBLIC_KEY" -o dump.sql.age dump.sql
           test -s dump.sql.age
 
