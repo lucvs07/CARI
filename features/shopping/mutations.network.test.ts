@@ -5,12 +5,14 @@ type Result = { error: { message: string; code?: string } | null; status: number
 
 const net = vi.hoisted(() => ({
   next: [] as Result[],
+  throwAlways: null as Error | null,
   calls: 0,
   rpcCalls: 0,
 }));
 
 function respond(): Promise<Result> {
   net.calls++;
+  if (net.throwAlways) throw net.throwAlways;
   return Promise.resolve(net.next.length > 1 ? net.next.shift()! : net.next[0]);
 }
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   net.next = [OK];
   net.calls = 0;
   net.rpcCalls = 0;
+  net.throwAlways = null;
   vi.mocked(toast.error).mockClear();
   onlineManager.setOnline(true);
   qc = new QueryClient();
@@ -147,6 +150,17 @@ test("erro do servidor (com código) mantém o rollback e o toast", async () => 
   expect(cached()[0].checked).toBe(false);
   expect(onlineManager.isOnline()).toBe(true);
   expect(toast.error).toHaveBeenCalledWith(cari.genericError, expect.anything());
+});
+
+test("TypeError de código (não de rede) segue o caminho de erro: sem ficar offline nem tentar para sempre", async () => {
+  // Ex.: variables restauradas num formato antigo. Toda tentativa lança o mesmo bug.
+  net.throwAlways = new TypeError("Cannot read properties of undefined (reading 'id')");
+  tap();
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(net.calls).toBe(4);
+  expect(onlineManager.isOnline()).toBe(true);
+  expect(cached()[0].checked).toBe(false);
+  expect(toast.error).toHaveBeenCalled();
 });
 
 test("finalizar com marcação ainda na fila: não chama o RPC e não vira 'já guardaram'", async () => {

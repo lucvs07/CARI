@@ -38,3 +38,8 @@ test("throwIfError: status 0 vira NetworkError; erro com resposta é relançado 
     expect(isNetworkError(e)).toBe(false);
   }
 });
+
+test("TypeError solto é bug de código, não falha de rede (o postgrest-js devolve status 0 para isso)", () => {
+  expect(isNetworkError(new TypeError("x"))).toBe(false);
+  expect(isNetworkError(new NetworkError())).toBe(true);
+});

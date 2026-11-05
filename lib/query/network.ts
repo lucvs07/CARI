@@ -38,8 +38,13 @@ export class NetworkError extends Error {
   }
 }
 
+/**
+ * TypeError solto não conta: o postgrest-js já converte o "Failed to fetch" em `status: 0`
+ * (→ NetworkError via throwIfError); um TypeError que chega aqui é bug de código ou de dados, e
+ * tratá-lo como rede deixaria a escrita tentando para sempre com o app preso em "offline".
+ */
 export function isNetworkError(err: unknown): boolean {
-  if (err instanceof NetworkError || err instanceof TypeError) return true;
+  if (err instanceof NetworkError) return true;
   const name = (err as { name?: unknown } | null)?.name;
   return name === "NetworkError" || name === "AbortError" || name === "TimeoutError";
 }
