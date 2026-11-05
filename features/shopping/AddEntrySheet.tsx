@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cari } from "@/features/cari/messages";
 import { QuantityField, UnitCategoryFields } from "@/features/inventory/ItemFields";
+import { useCurrentUserId } from "@/features/shell/CurrentUser";
 import { LAST_CATEGORY, LAST_UNIT, readStored, writeStored } from "@/features/inventory/lastChoice";
 import { normalizeName, type Item } from "@/features/inventory/schema";
 import { CATEGORIES, type Category } from "@/lib/categories";
@@ -73,6 +74,7 @@ function AddEntryForm({
   const [category, setCategory] = useState<Category>(() => readStored(LAST_CATEGORY, CATEGORIES, "outros"));
   const [error, setError] = useState<string | null>(null);
   const upsert = useUpsertEntry();
+  const userId = useCurrentUserId();
 
   const query = normalizeName(name);
   const suggestions = picked || !query ? [] : items.filter((i) => normalizeName(i.name).includes(query)).slice(0, 5);
@@ -108,6 +110,7 @@ function AddEntryForm({
     // Sem await: offline a escrita fica na fila e a UI já mostra a entrada.
     upsert.mutate({
       householdId,
+      userId,
       entry: {
         id: crypto.randomUUID(),
         name: item?.name ?? trimmed,

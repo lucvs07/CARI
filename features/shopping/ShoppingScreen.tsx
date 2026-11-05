@@ -11,6 +11,7 @@ import { CariSays } from "@/features/cari/CariSays";
 import { cari } from "@/features/cari/messages";
 import type { Member } from "@/features/households/queries";
 import { useMembers } from "@/features/households/useMembers";
+import { useCurrentUserId } from "@/features/shell/CurrentUser";
 import { QuantityField } from "@/features/inventory/ItemFields";
 import { useItems } from "@/features/inventory/queries";
 import type { Item } from "@/features/inventory/schema";
@@ -41,6 +42,7 @@ export function ShoppingScreen({
   const { data: items = [] } = useItems(householdId, initialItems);
   const { data: members = [] } = useMembers(householdId, initialMembers);
   const online = useOnlineStatus();
+  const userId = useCurrentUserId();
   const setChecked = useSetChecked();
   const setQuantity = useSetEntryQuantity();
   const remove = useRemoveEntry();
@@ -66,7 +68,7 @@ export function ShoppingScreen({
 
   function toggle(entry: Entry) {
     navigator.vibrate?.(10);
-    setChecked.mutate({ householdId, id: entry.id, checked: !current(entry).checked });
+    setChecked.mutate({ householdId, id: entry.id, checked: !current(entry).checked, userId });
   }
 
   function removeEntry(entry: Entry) {
@@ -78,6 +80,7 @@ export function ShoppingScreen({
         onClick: () =>
           upsert.mutate({
             householdId,
+            userId,
             entry: {
               id: row.id,
               name: row.name,

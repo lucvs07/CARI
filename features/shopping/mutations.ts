@@ -28,8 +28,13 @@ export type EntryInput = {
   added_by?: string | null;
 };
 
-export type UpsertEntryVars = { householdId: string; entry: EntryInput };
-export type SetCheckedVars = { householdId: string; id: string; checked: boolean };
+/**
+ * `userId` vem de quem chama (sessão conhecida no toque, via useCurrentUserId): nenhuma chamada de
+ * auth no onMutate/mutationFn — offline com token vencendo, getSession segura o lock por ~30 s.
+ * Mutações persistidas antes deste campo existir não o têm: cai para null.
+ */
+export type UpsertEntryVars = { householdId: string; entry: EntryInput; userId?: string | null };
+export type SetCheckedVars = { householdId: string; id: string; checked: boolean; userId?: string | null };
 export type SetEntryQuantityVars = { householdId: string; id: string; quantity: number | null };
 export type RemoveEntryVars = { householdId: string; id: string };
 
@@ -37,12 +42,6 @@ export type RemoveEntryVars = { householdId: string; id: string };
 type Ctx = { prev: Entry | undefined };
 
 const LIST_SCOPE = { id: "list" };
-
-async function currentUserId(): Promise<string | null> {
-  // getSession lê a sessão local (funciona sem rede), ao contrário de getUser.
-  const { data } = await getBrowserSupabase().auth.getSession();
-  return data.session?.user.id ?? null;
-}
 
 function patchList(qc: QueryClient, householdId: string, fn: (rows: Entry[]) => Entry[]) {
   qc.setQueryData<Entry[]>(listKey(householdId), (rows) => (rows ? fn(rows) : rows));
@@ -104,13 +103,13 @@ function entriesTable() {
 export function registerListMutationDefaults(qc: QueryClient): void {
   qc.setMutationDefaults<void, Error, UpsertEntryVars, Ctx>(listMutationKey("upsert"), {
     scope: LIST_SCOPE,
-    mutationFn: async ({ householdId, entry }) => {
+    mutationFn: async ({ householdId, entry, userId }) => {
       const { checked, added_by, ...fields } = entry;
       const { error } = await entriesTable().upsert(
         {
           ...fields,
           household_id: householdId,
-          added_by: added_by !== undefined ? added_by : await currentUserId(),
+          added_by: added_by !== undefined ? added_by : (userId ?? null),
           ...(checked !== undefined ? { checked } : {}),
         },
         { onConflict: "id" },
@@ -118,9 +117,9 @@ export function registerListMutationDefaults(qc: QueryClient): void {
       // Item do estoque que outro aparelho já pôs na lista (índice único em item_id): a entrada existe, ok.
       if (error && !(error.code === "23505" && entry.item_id)) throw error;
     },
-    onMutate: async ({ householdId, entry }) => {
+    onMutate: ({ householdId, entry, userId }) => {
       const { checked, added_by, ...fields } = entry;
-      const userId = added_by !== undefined ? added_by : await currentUserId();
+      const addedBy = added_by !== undefined ? added_by : (userId ?? null);
       const now = new Date().toISOString();
       return beginOptimistic(qc, householdId, entry.id, (rows) => {
         const existing = rows.find((r) => r.id === entry.id);
@@ -130,7 +129,7 @@ export function registerListMutationDefaults(qc: QueryClient): void {
           household_id: householdId,
           checked: checked ?? false,
           checked_by: null,
-          added_by: userId,
+          added_by: addedBy,
           created_at: now,
           updated_at: now,
         };
@@ -146,19 +145,17 @@ export function registerListMutationDefaults(qc: QueryClient): void {
 
   qc.setMutationDefaults<void, Error, SetCheckedVars, Ctx>(listMutationKey("setChecked"), {
     scope: LIST_SCOPE,
-    mutationFn: async ({ householdId, id, checked }) => {
+    mutationFn: async ({ householdId, id, checked, userId }) => {
       const { error } = await entriesTable()
-        .update({ checked, checked_by: checked ? await currentUserId() : null })
+        .update({ checked, checked_by: checked ? (userId ?? null) : null })
         .eq("id", id)
         .eq("household_id", householdId);
       if (error) throw error;
     },
-    onMutate: async ({ householdId, id, checked }) => {
-      const userId = checked ? await currentUserId() : null;
-      return beginOptimistic(qc, householdId, id, (rows) =>
-        rows.map((r) => (r.id === id ? { ...r, checked, checked_by: userId } : r)),
-      );
-    },
+    onMutate: ({ householdId, id, checked, userId }) =>
+      beginOptimistic(qc, householdId, id, (rows) =>
+        rows.map((r) => (r.id === id ? { ...r, checked, checked_by: checked ? (userId ?? null) : null } : r)),
+      ),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
       failToast(qc, "setChecked", err, vars);

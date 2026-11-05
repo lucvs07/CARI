@@ -1,9 +1,20 @@
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
 import { authStatePath, loginAs } from "./helpers/auth";
-import { A1, resetFixture, setEntriesChecked } from "./helpers/db";
+import { A1, adminClient, isEntryChecked, resetFixture, setEntriesChecked } from "./helpers/db";
 import { waitForRealtimeReady } from "./helpers/realtime";
 
 const BASE_URL = "http://localhost:3000";
+
+async function checkedBy(name: string): Promise<string | null> {
+  const { data, error } = await adminClient()
+    .from("shopping_list_entries")
+    .select("checked_by")
+    .eq("household_id", A1)
+    .eq("name", name)
+    .single();
+  if (error) throw error;
+  return data.checked_by;
+}
 
 test.beforeEach(async () => {
   await resetFixture();
@@ -109,4 +120,37 @@ test("remover entrada e desfazer", async ({ page }) => {
   await expect(entry(page, "Sorvete")).toHaveCount(0);
   await page.getByRole("button", { name: "Desfazer" }).click();
   await expect(entry(page, "Sorvete")).toBeVisible();
+});
+
+test("toques rápidos encadeiam: 2 toques desmarcam, 3 toques marcam", async ({ page }) => {
+  await openLista(page);
+  // Latência nas escritas: os toques chegam antes de qualquer resposta do servidor.
+  await page.route("**/rest/v1/shopping_list_entries*", async (r) => {
+    if (r.request().method() === "PATCH") await new Promise((res) => setTimeout(res, 400));
+    await r.continue();
+  });
+
+  for (let i = 0; i < 2; i++) await entry(page, "Azeite").click();
+  await expect(entry(page, "Azeite")).toHaveAttribute("aria-pressed", "false");
+  await page.waitForTimeout(1500);
+  await expect(entry(page, "Azeite")).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => isEntryChecked("Azeite")).toBe(false);
+
+  for (let i = 0; i < 3; i++) await entry(page, "Azeite").click();
+  await expect(entry(page, "Azeite")).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(2000);
+  await expect(entry(page, "Azeite")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => isEntryChecked("Azeite")).toBe(true);
+});
+
+test("toques offline encadeiam e marcação leva quem marcou", async ({ page, context }) => {
+  await openLista(page);
+  await context.setOffline(true);
+  for (let i = 0; i < 3; i++) await entry(page, "Azeite").click();
+  await expect(entry(page, "Azeite")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("3 alterações aguardando sinal")).toBeVisible();
+  await context.setOffline(false);
+  await expect(page.getByText(/aguardando sinal/)).toHaveCount(0);
+  await expect.poll(() => isEntryChecked("Azeite")).toBe(true);
+  await expect.poll(() => checkedBy("Azeite")).not.toBeNull();
 });
