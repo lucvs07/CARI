@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { cari } from "@/features/cari/messages";
 import { createHousehold } from "./actions";
 
-const nameSchema = z.string().trim().min(1, "Dá um nome para a casa.").max(60, "Use até 60 caracteres.");
+const nameSchema = z.string().trim().min(1, cari.houseNameRequired).max(60, cari.houseNameTooLong);
 
 export function CreateHouseholdForm() {
   const router = useRouter();

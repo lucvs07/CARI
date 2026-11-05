@@ -14,7 +14,7 @@ function LoginForm() {
   const next = safeNext(params.get("next"));
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(params.get("erro") ? "Esse link não funcionou. Pede outro." : null);
+  const [error, setError] = useState<string | null>(params.get("erro") ? cari.loginLinkFailed : null);
   const [busy, setBusy] = useState(false);
 
   const callback = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;

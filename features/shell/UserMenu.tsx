@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +18,7 @@ import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { ThemeToggle } from "./ThemeToggle";
 
 export async function signOut({ clearQueryCache }: { clearQueryCache?: () => void } = {}) {
-  clearQueryCache?.(); // Task 9: passar queryClient.clear
+  clearQueryCache?.();
   await clearPersistedCache();
   if (typeof window !== "undefined" && "caches" in window) await caches.delete("cari-lista");
   await getBrowserSupabase().auth.signOut({ scope: "local" });
@@ -25,9 +26,10 @@ export async function signOut({ clearQueryCache }: { clearQueryCache?: () => voi
 
 export function UserMenu({ householdId, email }: { householdId?: string; email?: string } = {}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   async function handleSignOut() {
-    await signOut();
+    await signOut({ clearQueryCache: () => queryClient.clear() });
     router.replace("/login");
   }
 

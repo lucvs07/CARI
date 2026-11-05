@@ -55,15 +55,17 @@ export function useThemePreference(): ThemePreference {
   return useSyncExternalStore(subscribe, read, () => "system");
 }
 
+function subscribeSystem(cb: () => void) {
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
 /** Tema efetivo ("light" | "dark"), para componentes de terceiros como o Toaster. */
 export function useResolvedTheme(): "light" | "dark" {
   const pref = useThemePreference();
   return useSyncExternalStore(
-    (cb) => {
-      const mq = matchMedia("(prefers-color-scheme: dark)");
-      mq.addEventListener("change", cb);
-      return () => mq.removeEventListener("change", cb);
-    },
+    subscribeSystem,
     () => (pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"),
     () => "light",
   );

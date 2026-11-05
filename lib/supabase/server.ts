@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { cookies, headers } from "next/headers";
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import type { Database } from "./database.types";
 
 export async function createServerSupabase(): Promise<SupabaseClient<Database>> {
+  // O auth-js lê Date.now() ao carregar a sessão: só depois do limite dinâmico (nunca no prerender).
+  await connection();
   const cookieStore = await cookies();
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/features/shell/AppShell";
 import { getHouseholds } from "@/features/households/queries";
+import { RealtimeBridge } from "@/lib/query/RealtimeBridge";
 import { createServerSupabase, requireUser } from "@/lib/supabase/server";
 
 export const instant = false;
@@ -18,6 +19,7 @@ export default async function HouseholdLayout({ children, params }: LayoutProps<
       households={households.map(({ id, name }) => ({ id, name }))}
       user={{ id: user.id, email: user.email }}
     >
+      <RealtimeBridge householdId={householdId} />
       {children}
     </AppShell>
   );

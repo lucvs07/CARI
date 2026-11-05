@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { Toaster } from "@/components/ui/sonner";
 import { themeInitScript } from "@/features/shell/theme";
+import { Providers } from "@/lib/query/Providers";
 import "./globals.css";
 
 const chillax = localFont({
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="flex min-h-full flex-col font-sans">
-        {children}
+        <Providers>{children}</Providers>
         <Toaster duration={6000} />
       </body>
     </html>
