@@ -9,6 +9,15 @@ export function rememberLastHousehold(householdId: string): void {
   }
 }
 
+/** Ao sair da conta: a próxima pessoa não é levada à Lista de outra casa. */
+export function forgetLastHousehold(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // storage bloqueado: nada guardado
+  }
+}
+
 export function lastListaHref(): string {
   try {
     const id = localStorage.getItem(KEY);

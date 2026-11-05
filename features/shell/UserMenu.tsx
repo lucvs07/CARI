@@ -13,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LISTA_CACHE } from "@/features/pwa/cacheNames";
+import { forgetLastHousehold } from "@/features/pwa/lastHousehold";
 import { clearPersistedCache, persister } from "@/lib/query/persist";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { ThemeToggle } from "./ThemeToggle";
@@ -34,7 +36,8 @@ export async function signOut({ queryClient, navigate }: SignOutDeps) {
       queryClient.clear();
       await persister.removeClient();
       await clearPersistedCache();
-      if (typeof window !== "undefined" && "caches" in window) await caches.delete("cari-lista");
+      forgetLastHousehold();
+      if (typeof window !== "undefined" && "caches" in window) await caches.delete(LISTA_CACHE);
     } catch {
       // limpeza falhou: nunca bloqueia o logout
     } finally {

@@ -119,3 +119,30 @@ test("sem sinal, tocar na aba Estoque mostra a tela offline da Cari", async ({ p
     timeout: 10_000,
   });
 });
+
+test("SW novo (deploy) apaga a Lista guardada: sem sinal, tela offline em vez de página morta", async ({ page, context }) => {
+  await openLista(page);
+  await primeServiceWorker(page);
+  const listaCached = () =>
+    page.evaluate(async () => (await (await caches.open("cari-lista")).keys()).length);
+  await expect.poll(listaCached).toBeGreaterThan(0);
+
+  // Sai da Lista (como fechar a aba): nela um RSC da rota fica aberto e segura a ativação do SW novo.
+  await page.goto("/offline");
+  // Simula um deploy: outra URL de script no mesmo escopo é um SW novo (instala, skipWaiting, ativa).
+  // O Playwright não intercepta o fetch do script do SW, então não dá para trocar o corpo do sw.js.
+  await page.evaluate(() => navigator.serviceWorker.register("/sw.js?deploy=2", { scope: "/", type: "module" }));
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const reg = await navigator.serviceWorker.getRegistration();
+        return !!reg?.active?.scriptURL.includes("deploy=2") && reg.active.state === "activated";
+      }),
+    )
+    .toBe(true);
+  await expect.poll(listaCached).toBe(0);
+
+  await context.setOffline(true);
+  await page.goto(`/${A1}/lista`);
+  await expect(page.getByText("Estou sem sinal e ainda não tenho essa tela guardada.", { exact: false })).toBeVisible();
+});

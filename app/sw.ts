@@ -1,7 +1,9 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { NetworkFirst, NetworkOnly, Serwist } from "serwist";
+import { ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
+import { LISTA_CACHE } from "@/features/pwa/cacheNames";
+import { clearListaOnActivate } from "@/features/pwa/swActivate";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -11,8 +13,6 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-/** Cache da Lista: o UserMenu apaga este cache ao sair da conta. */
-const LISTA_CACHE = "cari-lista";
 const LISTA_PATH = /^\/[^/]+\/lista\/?$/;
 
 /** Rota de página (não asset): fora de /_next/ e sem extensão. */
@@ -34,6 +34,8 @@ const serwist = new Serwist({
         cacheName: LISTA_CACHE,
         networkTimeoutSeconds: 3,
         plugins: [
+          // HTML + variantes `?_rsc=` (uma por estado do router): sem teto, cresceriam sem limite.
+          new ExpirationPlugin({ maxEntries: 32 }),
           {
             // Só guarda a Lista de verdade: nada de redirecionamento (login, casa alheia) nem erro.
             cacheWillUpdate: async ({ response }) =>
@@ -63,3 +65,6 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// Ao lado do activate do Serwist (que limpa o precache antigo); cada um estende o evento com waitUntil.
+self.addEventListener("activate", (event) => clearListaOnActivate(event, caches));

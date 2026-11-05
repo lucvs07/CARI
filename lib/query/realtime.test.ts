@@ -16,6 +16,17 @@ test("update atrasado (updated_at mais velho que o do cache) é ignorado", () =>
   const newer = { ...echo, quantity: 0.5, updated_at: "2026-11-05T02:26:06.400+00:00" };
   expect(applyRealtimeEvent([cached], { eventType: "UPDATE", new: newer, old: {} })).toEqual([newer]);
 });
+test("update com updated_at igual ao do cache é aplicado", () => {
+  const cached = { id: "a", name: "Leite", quantity: 1, updated_at: "2026-11-05T02:26:06.375+00:00" };
+  const same = { ...cached, quantity: 2 };
+  expect(applyRealtimeEvent([cached], { eventType: "UPDATE", new: same, old: {} })).toEqual([same]);
+});
+test("sem updated_at (no evento ou no cache) o update é aplicado", () => {
+  const withTs = { id: "a", name: "Leite", updated_at: "2026-11-05T02:26:06.375+00:00" };
+  const noTs = { id: "a", name: "Leite 2" };
+  expect(applyRealtimeEvent([withTs], { eventType: "UPDATE", new: noTs, old: {} })).toEqual([noTs]);
+  expect(applyRealtimeEvent([noTs], { eventType: "UPDATE", new: withTs, old: {} })).toEqual([withTs]);
+});
 test("delete só com pk", () =>
   expect(applyRealtimeEvent([a, b], { eventType: "DELETE", new: {}, old: { id: "a" } })).toEqual([b]));
 test("delete de id desconhecido", () =>

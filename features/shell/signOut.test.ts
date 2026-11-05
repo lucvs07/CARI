@@ -38,6 +38,13 @@ test("ordem: auth, cancel, clear, persistência, caches, clear, navegar", async 
   expect(calls).toEqual(["auth", "cancel", "clear", "removeClient", "persisted", "caches", "clear", "navigate"]);
 });
 
+test("apaga o cache da Lista e esquece a última casa", async () => {
+  localStorage.setItem("cari-last-household", "h1");
+  await signOut({ queryClient: qc, navigate });
+  expect(mocks.cachesDelete).toHaveBeenCalledWith("cari-lista");
+  expect(localStorage.getItem("cari-last-household")).toBeNull();
+});
+
 test("navega e desloga mesmo se clearPersistedCache falhar", async () => {
   mocks.clearPersisted.mockRejectedValue(new Error("idb"));
   await signOut({ queryClient: qc, navigate });
