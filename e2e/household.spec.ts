@@ -33,7 +33,7 @@ test("owner gera o link e o convidado entra na casa", async ({ browser }) => {
 
   const convidado = await pageFor(browser, "convidado@cari.test");
   await convidado.goto(url);
-  await expect(convidado.getByText("Entrar na casa?")).toBeVisible();
+  await expect(convidado.getByRole("heading", { name: "Entrar na casa Casa Lucas & Ana?" })).toBeVisible();
   await convidado.getByRole("button", { name: "Entrar" }).click();
   await expect(convidado).toHaveURL(new RegExp(`/${A1}/lista`));
   await expect(convidado.getByRole("button", { name: /Casa Lucas & Ana/ })).toBeVisible();
@@ -47,6 +47,8 @@ test("convite revogado mostra a fala da Cari", async ({ browser }) => {
 
   const convidado = await pageFor(browser, "convidado@cari.test");
   await convidado.goto(url);
+  // Token revogado: a prévia não revela o nome da casa.
+  await expect(convidado.getByRole("heading", { name: "Entrar na casa?" })).toBeVisible();
   await convidado.getByRole("button", { name: "Entrar" }).click();
   await expect(
     convidado.getByText("Não encontrei esse convite. Pede um link novo pra quem te chamou?"),
@@ -66,7 +68,7 @@ test("membro comum não gerencia convites", async ({ browser }) => {
   const ana = await pageFor(browser, "ana@cari.test");
   await ana.goto(`/${A1}/casa`);
   await expect(ana.getByRole("heading", { name: "Casa" })).toBeVisible();
-  await expect(ana.getByText("Lucas", { exact: true })).toBeVisible();
+  await expect(ana.getByRole("main").getByText("Lucas", { exact: true })).toBeVisible();
   await expect(ana.getByRole("button", { name: "Gerar link de convite" })).toHaveCount(0);
   await expect(ana.getByRole("button", { name: /^Ações de/ })).toHaveCount(0);
 });
@@ -118,5 +120,5 @@ test("/casa mostra quem entrou depois de o cache de membros já existir", async 
   await lucas.context().setOffline(false);
   await lucas.getByRole("button", { name: "Menu da conta" }).click();
   await lucas.getByRole("menuitem", { name: "Gerenciar casa" }).click();
-  await expect(lucas.getByText("Convidado", { exact: true })).toBeVisible();
+  await expect(lucas.getByRole("main").getByText("Convidado", { exact: true })).toBeVisible();
 });

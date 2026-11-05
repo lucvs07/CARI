@@ -197,6 +197,9 @@ isOneToOne: false
 "finish_shopping":
 { Args: { "p_entries": Json,"p_household_id": string }; Returns: number
                            },
+"invite_preview":
+{ Args: { "p_token": string }; Returns: string
+                           },
 "is_member":
 { Args: { "p_household_id": string }; Returns: boolean
                            },
@@ -208,6 +211,9 @@ isOneToOne: false
                            },
 "normalize_name":
 { Args: { "": string }; Returns: string
+                           },
+"ping":
+{ Args: Record<PropertyKey, never>; Returns: number
                            }
           }
           Enums: {

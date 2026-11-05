@@ -1,6 +1,6 @@
 name: Keepalive
 
-# O free tier do Supabase pausa projetos sem atividade. Uma consulta por semana evita a pausa.
+# O free tier do Supabase pausa projetos sem atividade. Uma chamada por semana evita a pausa.
 on:
   schedule:
     - cron: "0 12 * * 1"
@@ -17,9 +17,13 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
-      # O RLS devolve [], mas a consulta já conta como atividade. A resposta não é impressa.
-      - name: Consultar a API
+      # anon não lê nenhuma tabela (o REST devolveria 401): o ping é a RPC public.ping(), que só
+      # devolve 1 e passa pela API e pelo banco. Falha (-f) se a resposta não for 2xx.
+      - name: Chamar public.ping()
         run: |
-          curl -fsS -o /dev/null --retry 3 --retry-delay 10 \
-            "$SUPABASE_URL/rest/v1/households?select=id&limit=1" \
-            -H "apikey: $SUPABASE_ANON_KEY"
+          curl -fsS -o /dev/null --retry 3 --retry-delay 10 -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'
