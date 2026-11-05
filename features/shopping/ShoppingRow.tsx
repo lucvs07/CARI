@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useId } from "react";
+import { cari } from "@/features/cari/messages";
 import { formatQuantity, type Unit } from "@/lib/units";
 import { initials, type Entry } from "./model";
 
@@ -73,7 +74,7 @@ export function ShoppingRow({
               <AvatarFallback className="text-[0.625rem]">{initials(addedByName)}</AvatarFallback>
             </Avatar>
             <span id={addedById} className="sr-only">
-              adicionado por {addedByName}
+              {cari.addedBy(addedByName)}
             </span>
           </>
         )}

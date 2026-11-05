@@ -16,6 +16,8 @@ export const cari = {
   duplicateItem: (name: string) => `Já existe ${name} — somar quantidade?`,
   genericError: "Algo deu errado. Tenta de novo?",
   retryAction: "Tentar de novo",
+  undoAction: "Desfazer",
+  addedBy: (name: string) => `adicionado por ${name}`,
   notFound: "Procurei, mas não achei essa página. Vamos voltar para a sua casa?",
   goHome: "Ir para o início",
   loading: "Carregando…",

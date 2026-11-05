@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { cari } from "@/features/cari/messages";
 
 /** Aviso com "Desfazer" (spec §7): 6 s na tela. */
 export const UNDO_TOAST_MS = 6_000;
@@ -10,6 +11,6 @@ export const UNDO_TOAST_MS = 6_000;
 export function undoToast(message: string, onUndo: () => void) {
   return toast(<span role="status">{message}</span>, {
     duration: UNDO_TOAST_MS,
-    action: { label: "Desfazer", onClick: onUndo },
+    action: { label: cari.undoAction, onClick: onUndo },
   });
 }
