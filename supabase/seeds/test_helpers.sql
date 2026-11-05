@@ -69,8 +69,6 @@ begin
     where p.id = v.id;
 
   -- reseta a1
-  delete from public.shopping_list_entries where household_id = c_house;
-  delete from public.items where household_id = c_house;
   delete from public.household_invites where household_id = c_house;
   -- members antes dos owners, para não acionar guard_last_owner
   delete from public.household_members where household_id = c_house and role = 'member';
@@ -80,37 +78,88 @@ begin
     (c_house, c_lucas, 'owner'),
     (c_house, c_ana, 'member');
 
-  insert into public.items (household_id, name, quantity, unit, category, updated_by) values
-    (c_house, 'Leite',           2,   'L',  'laticinios', c_lucas),
-    (c_house, 'Iogurte',         0,   'un', 'laticinios', c_lucas),
-    (c_house, 'Arroz',           0,   'kg', 'mercearia',  c_lucas),
-    (c_house, 'Feijão',          1,   'kg', 'mercearia',  c_lucas),
-    (c_house, 'Macarrão',        2,   'un', 'mercearia',  c_lucas),
-    (c_house, 'Ovos',            6,   'un', 'laticinios', c_lucas),
-    (c_house, 'Pão de forma',    1,   'un', 'padaria',    c_lucas),
-    (c_house, 'Banana',          6,   'un', 'hortifruti', c_lucas),
-    (c_house, 'Tomate',          0.5, 'kg', 'hortifruti', c_lucas),
-    (c_house, 'Frango',          1,   'kg', 'carnes',     c_lucas),
-    (c_house, 'Água',            6,   'L',  'bebidas',    c_lucas),
-    (c_house, 'Detergente',      0,   'un', 'limpeza',    c_lucas),
-    (c_house, 'Sabão em pó',     1,   'un', 'limpeza',    c_lucas),
-    (c_house, 'Papel higiênico', 4,   'un', 'higiene',    c_lucas),
-    (c_house, 'Pasta de dente',  1,   'un', 'higiene',    c_lucas);
+  /*
+   * Itens e entradas estão na publicação do Realtime: cada linha escrita vira um evento para cada
+   * assinatura da casa. Apagar e recriar tudo a cada teste estourava o limite de eventos do Realtime
+   * local (100/s na média de 60 s), que então descarta TODOS os eventos da casa por dezenas de
+   * segundos. Por isso o reset só toca as linhas que diferem do seed (diferença mínima).
+   */
+  create temporary table if not exists fixture_items (
+    name text, quantity numeric, unit public.unit, category text
+  ) on commit drop;
+  truncate pg_temp.fixture_items;
+  insert into pg_temp.fixture_items values
+    ('Leite',           2,   'L',  'laticinios'),
+    ('Iogurte',         0,   'un', 'laticinios'),
+    ('Arroz',           0,   'kg', 'mercearia'),
+    ('Feijão',          1,   'kg', 'mercearia'),
+    ('Macarrão',        2,   'un', 'mercearia'),
+    ('Ovos',            6,   'un', 'laticinios'),
+    ('Pão de forma',    1,   'un', 'padaria'),
+    ('Banana',          6,   'un', 'hortifruti'),
+    ('Tomate',          0.5, 'kg', 'hortifruti'),
+    ('Frango',          1,   'kg', 'carnes'),
+    ('Água',            6,   'L',  'bebidas'),
+    ('Detergente',      0,   'un', 'limpeza'),
+    ('Sabão em pó',     1,   'un', 'limpeza'),
+    ('Papel higiênico', 4,   'un', 'higiene'),
+    ('Pasta de dente',  1,   'un', 'higiene');
 
-  -- entradas ligadas ao estoque
-  insert into public.shopping_list_entries
-    (household_id, item_id, name, quantity, unit, category, checked, added_by)
-  select c_house, i.id, i.name, e.quantity, i.unit, i.category, false, c_ana
+  delete from public.items i
+    where i.household_id = c_house
+      and not exists (
+        select 1 from pg_temp.fixture_items f where public.normalize_name(f.name) = i.name_key
+      );
+
+  update public.items i
+    set name = f.name, quantity = f.quantity, unit = f.unit, category = f.category, updated_by = c_lucas
+    from pg_temp.fixture_items f
+    where i.household_id = c_house
+      and i.name_key = public.normalize_name(f.name)
+      and (i.name, i.quantity, i.unit, i.category, i.updated_by)
+          is distinct from (f.name, f.quantity, f.unit, f.category, c_lucas);
+
+  insert into public.items (household_id, name, quantity, unit, category, updated_by)
+  select c_house, f.name, f.quantity, f.unit, f.category, c_lucas
+  from pg_temp.fixture_items f
+  where not exists (
+    select 1 from public.items i
+    where i.household_id = c_house and i.name_key = public.normalize_name(f.name)
+  );
+
+  -- entradas: ligadas ao estoque (Arroz, Iogurte, Detergente) e avulsas (Azeite, Sorvete)
+  create temporary table if not exists fixture_entries (
+    item_id uuid, name text, quantity numeric, unit public.unit, category text
+  ) on commit drop;
+  truncate pg_temp.fixture_entries;
+  insert into pg_temp.fixture_entries
+  select i.id, i.name, e.quantity, i.unit, i.category
   from (values ('Arroz', 2::numeric), ('Iogurte', null::numeric), ('Detergente', 1::numeric))
        as e(name, quantity)
   join public.items i
     on i.household_id = c_house and i.name_key = public.normalize_name(e.name);
+  insert into pg_temp.fixture_entries values
+    (null, 'Azeite',  1,    'un', 'mercearia'),
+    (null, 'Sorvete', null, 'un', 'congelados');
 
-  -- entradas avulsas
+  delete from public.shopping_list_entries s
+    where s.household_id = c_house
+      and not exists (
+        select 1 from pg_temp.fixture_entries f
+        where (s.item_id, s.name, s.quantity, s.unit, s.category, s.checked, s.checked_by, s.added_by)
+              is not distinct from (f.item_id, f.name, f.quantity, f.unit, f.category, false, null::uuid, c_ana)
+      );
+
   insert into public.shopping_list_entries
-    (household_id, item_id, name, quantity, unit, category, checked, added_by) values
-    (c_house, null, 'Azeite',  1,    'un', 'mercearia',  false, c_ana),
-    (c_house, null, 'Sorvete', null, 'un', 'congelados', false, c_ana);
+    (household_id, item_id, name, quantity, unit, category, checked, added_by)
+  select c_house, f.item_id, f.name, f.quantity, f.unit, f.category, false, c_ana
+  from pg_temp.fixture_entries f
+  where not exists (
+    select 1 from public.shopping_list_entries s
+    where s.household_id = c_house
+      and (s.item_id, s.name, s.quantity, s.unit, s.category, s.checked, s.checked_by, s.added_by)
+          is not distinct from (f.item_id, f.name, f.quantity, f.unit, f.category, false, null::uuid, c_ana)
+  );
 
   -- última casa visitada
   update public.profiles set last_household_id = c_house where id in (c_lucas, c_ana);
