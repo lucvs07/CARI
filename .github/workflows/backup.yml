@@ -21,17 +21,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+
+      # Usa a versão do CLI travada no package-lock, não a última do npm
+      - run: npm ci
 
       - name: Instalar o age
-        run: sudo apt-get install -y age
+        run: sudo apt-get update && sudo apt-get install -y age
 
       # O repositório é público: o dump em texto puro nunca pode virar artefato nem log.
       # O dump de dados já inclui auth.users, então o restore não deixa perfis órfãos.
+      # Sessões e refresh tokens ficam de fora: não têm valor num restore e são sensíveis.
       - name: Gerar o dump e criptografar
         run: |
           set -euo pipefail
           trap 'rm -f dump.sql' EXIT
-          npx supabase db dump --remote="$SUPABASE_DB_URL" --data-only -f dump.sql > /dev/null
+          npx supabase db dump --remote="$SUPABASE_DB_URL" --data-only \
+            -x auth.sessions,auth.refresh_tokens -f dump.sql > /dev/null
           age -r "$BACKUP_AGE_PUBLIC_KEY" -o dump.sql.age dump.sql
           test -s dump.sql.age
 

@@ -45,7 +45,7 @@ Tudo roda em free tiers: Supabase Cloud (banco, auth e realtime), Vercel (front)
    | `SUPABASE_DB_PASSWORD` | migrations | senha do banco do projeto |
    | `SUPABASE_URL` | keepalive | URL do projeto (`https://<ref>.supabase.co`) |
    | `SUPABASE_ANON_KEY` | keepalive | chave `anon` (pública) |
-   | `SUPABASE_DB_URL` | backup | string de conexão do Postgres (use a do pooler, Settings > Database) |
+   | `SUPABASE_DB_URL` | backup | string de conexão do Postgres (Settings > Database > Connection string > **Session pooler, porta 5432**; os runners do GitHub não têm IPv6, então a conexão direta falha, e o transaction pooler não serve para o `pg_dump`) |
    | `BACKUP_AGE_PUBLIC_KEY` | backup | chave pública `age` (`age1...`) |
 
 6. **Chave do backup.** Gere o par com `age-keygen -o chave.txt`. Guarde `chave.txt` (privada) fora do repositório, por exemplo em um gerenciador de senhas, e cadastre só a chave pública (linha `Public key: age1...`) em `BACKUP_AGE_PUBLIC_KEY`. Sem a chave privada o backup não pode ser restaurado.
@@ -55,17 +55,17 @@ Tudo roda em free tiers: Supabase Cloud (banco, auth e realtime), Vercel (front)
 - `ci.yml`: lint, tipos, testes unitários, pgTAP e E2E contra um Supabase local, em todo PR e push para `main`.
 - `migrate.yml`: aplica `supabase/migrations/**` no projeto na nuvem a cada push para `main` que mude migrations (ou manualmente).
 - `keepalive.yml`: uma consulta por semana à API para o projeto free não ser pausado por inatividade.
-- `backup.yml`: todo domingo gera o dump dos dados (inclui `auth.users`), criptografa com `age` e envia só o `dump.sql.age` como artefato (90 dias). O dump em texto puro nunca é enviado nem impresso nos logs.
+- `backup.yml`: todo domingo gera o dump dos dados (inclui `auth.users`, sem sessões nem refresh tokens), criptografa com `age` e envia só o `dump.sql.age` como artefato (90 dias). O dump em texto puro nunca é enviado nem impresso nos logs.
 
 ### Restaurar um backup
 
-Baixe o artefato `backup-criptografado` da execução desejada e, em um banco com as migrations já aplicadas (`npx supabase db push`) e sem dados, rode:
+Baixe o artefato `backup-criptografado` da execução desejada e, em um banco com as migrations já aplicadas (rode o workflow Migrations, ou `npx supabase link --project-ref <ref>` + `npx supabase db push --remote --yes`) e sem dados, rode:
 
 ```bash
-age -d -i chave.txt dump.sql.age | psql "$SUPABASE_DB_URL"
+age -d -i chave.txt dump.sql.age | psql -v ON_ERROR_STOP=1 --single-transaction "$SUPABASE_DB_URL"
 ```
 
-O dump já traz `auth.users`, então perfis e membros não ficam órfãos. Restaure em um banco vazio: em um banco com dados, os `INSERT`s de linhas existentes falham por chave duplicada.
+O dump já traz `auth.users`, então perfis e membros não ficam órfãos. Sessões não são salvas: quem estava logado precisa entrar de novo. Restaure em um banco vazio: em um banco com dados, os `INSERT`s de linhas existentes falham por chave duplicada.
 
 ## História
 

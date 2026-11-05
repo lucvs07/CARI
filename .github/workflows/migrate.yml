@@ -22,6 +22,8 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      # CLI 3.0: mudanças no projeto hospedado exigem consentimento explícito (sem TTY no CI)
+      SUPABASE_YES: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +35,7 @@ jobs:
       - run: npm ci
 
       - name: Vincular ao projeto
-        run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF" --yes
 
       - name: Aplicar migrations
-        run: npx supabase db push --remote
+        run: npx supabase db push --remote --yes
