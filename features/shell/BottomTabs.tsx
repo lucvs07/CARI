@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Package, ShoppingCart } from "lucide-react";
 import { cn } from "cn";
+import { countUnchecked } from "@/features/shopping/model";
+import { useList } from "@/features/shopping/queries";
 
 const TABS = [
   { slug: "estoque", label: "Estoque", Icon: Package },
@@ -13,6 +15,9 @@ const TABS = [
 
 export function BottomTabs({ householdId }: { householdId: string }) {
   const pathname = usePathname();
+  // Mesmo cache ['list', id] da tela: o Realtime e as escritas otimistas mantêm o número vivo.
+  const { data: entries } = useList(householdId);
+  const pendingCount = countUnchecked(entries);
   return (
     <nav
       aria-label="Principal"
@@ -32,8 +37,19 @@ export function BottomTabs({ householdId }: { householdId: string }) {
                   active ? "text-primary" : "text-secondary",
                 )}
               >
-                <Icon className="size-5" aria-hidden />
+                <span className="relative">
+                  <Icon className="size-5" aria-hidden />
+                  {slug === "lista" && pendingCount > 0 && (
+                    <span
+                      aria-hidden
+                      className="absolute -top-1.5 left-3 min-w-4 rounded-full bg-primary px-1 text-center text-[0.625rem] leading-4 font-semibold text-primary-foreground tabular-nums"
+                    >
+                      {pendingCount}
+                    </span>
+                  )}
+                </span>
                 {label}
+                {slug === "lista" && pendingCount > 0 && <span className="sr-only">({pendingCount} a comprar)</span>}
               </Link>
             </li>
           );

@@ -16,6 +16,9 @@ const chillax = localFont({
   ],
 });
 
+// Acima das abas e dos botões flutuantes (FAB/Finalizar compra): o aviso não cobre nenhum controle.
+const TOAST_BOTTOM = "calc(8.5rem + env(safe-area-inset-bottom))";
+
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
@@ -31,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col font-sans">
         <Providers>{children}</Providers>
-        <Toaster duration={6000} />
+        <Toaster duration={6000} offset={{ bottom: TOAST_BOTTOM }} mobileOffset={{ bottom: TOAST_BOTTOM }} />
       </body>
     </html>
   );

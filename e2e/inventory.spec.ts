@@ -48,7 +48,7 @@ test("Leite diminuído até 0 vai para a lista", async ({ page }) => {
   await expect(page.getByText("Leite foi para a lista")).toBeVisible();
   await page.getByRole("link", { name: "Lista" }).click();
   await expect(page).toHaveURL(/\/lista/);
-  await expect.poll(listEntryNames).toContain("Leite");
+  await expect(page.getByRole("region", { name: "Laticínios" }).getByRole("button", { name: "Leite", exact: true })).toBeVisible();
 });
 
 test("desfazer devolve Leite a 0,5 L e fora da lista", async ({ page }) => {

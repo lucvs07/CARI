@@ -13,28 +13,9 @@ import { toCariError } from "@/lib/errors";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { UNITS, type Unit } from "@/lib/units";
 import { QuantityField, UnitCategoryFields } from "./ItemFields";
+import { LAST_CATEGORY, LAST_UNIT, readStored, writeStored } from "./lastChoice";
 import { useUpsertItem } from "./mutations";
 import { itemInputSchema, normalizeName, type Item } from "./schema";
-
-const LAST_UNIT = "cari-last-unit";
-const LAST_CATEGORY = "cari-last-category";
-
-function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    return v && (allowed as readonly string[]).includes(v) ? (v as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStored(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Armazenamento indisponível: só perde o pré-preenchimento.
-  }
-}
 
 export function QuickAddSheet({
   open,

@@ -5,7 +5,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { GC_TIME, makeQueryClient } from "./client";
 import { persister } from "./persist";
 
-const PERSISTED_KEYS = ["items", "list"];
+const PERSISTED_KEYS = ["items", "list", "members"];
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(makeQueryClient);

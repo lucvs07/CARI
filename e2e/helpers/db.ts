@@ -36,3 +36,27 @@ export async function resetFixture(): Promise<void> {
     await client.end();
   }
 }
+
+export const A1 = "00000000-0000-0000-0000-0000000000a1";
+
+/** Estado `checked` da entrada da casa a1 com esse nome (falso se não existir). */
+export async function isEntryChecked(name: string): Promise<boolean> {
+  const { data, error } = await adminClient()
+    .from("shopping_list_entries")
+    .select("checked")
+    .eq("household_id", A1)
+    .eq("name", name)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.checked ?? false;
+}
+
+/** Marca entradas direto no banco (preparação de cenários). */
+export async function setEntriesChecked(names: string[], checked: boolean): Promise<void> {
+  const { error } = await adminClient()
+    .from("shopping_list_entries")
+    .update({ checked })
+    .eq("household_id", A1)
+    .in("name", names);
+  if (error) throw error;
+}
