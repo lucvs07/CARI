@@ -20,3 +20,18 @@ export function applyRealtimeEvent<T extends { id: string }>(
   if (i === -1) return [...rows, next];
   return rows.map((r, j) => (j === i ? next : r));
 }
+
+export type PendingMutation = { mutationKey?: readonly unknown[]; variables?: unknown };
+
+/**
+ * Evento do Realtime para o cache [key, householdId] é ignorado enquanto houver mutação pendente
+ * dessa casa com mutationKey[0] === key: o eco da própria escrita sobrescreveria o estado otimista.
+ * A invalidação após a última mutação reconcilia com o servidor.
+ */
+export function shouldSkipRealtime(pending: PendingMutation[], key: string, householdId: string): boolean {
+  return pending.some(
+    (m) =>
+      m.mutationKey?.[0] === key &&
+      (m.variables as { householdId?: unknown } | undefined)?.householdId === householdId,
+  );
+}

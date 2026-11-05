@@ -63,7 +63,6 @@ export function QuickAddSheet({
 type Pending = { existing: Item; quantity: number };
 
 function QuickAddForm({ householdId, items, onDone }: { householdId: string; items: Item[]; onDone: () => void }) {
-  const upsert = useUpsertItem();
   const nameId = useId();
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Item | null>(null);
@@ -72,6 +71,7 @@ function QuickAddForm({ householdId, items, onDone }: { householdId: string; ite
   const [category, setCategory] = useState<Category>(() => readStored(LAST_CATEGORY, CATEGORIES, "outros"));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const upsert = useUpsertItem(picked?.id ?? pending?.existing.id);
 
   const query = normalizeName(name);
   const suggestions = picked || !query ? [] : items.filter((i) => normalizeName(i.name).includes(query)).slice(0, 5);

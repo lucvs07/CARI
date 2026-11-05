@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { MinusIcon, MoreVerticalIcon, PlusIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatQuantity, stepQuantity } from "@/lib/units";
 import { useMarkEmpty, useRemoveItem, useSetItemQuantity } from "./mutations";
+import { itemsKey } from "./queries";
 import type { Item } from "./schema";
 
 export function InventoryRow({
@@ -24,15 +26,18 @@ export function InventoryRow({
   online: boolean;
   onEdit: (item: Item) => void;
 }) {
-  const setQuantity = useSetItemQuantity();
-  const markEmpty = useMarkEmpty();
-  const remove = useRemoveItem();
+  const qc = useQueryClient();
+  const setQuantity = useSetItemQuantity(item.id);
+  const markEmpty = useMarkEmpty(item.id);
+  const remove = useRemoveItem(item.id);
   const empty = item.quantity === 0;
 
   function step(dir: 1 | -1) {
-    const next = stepQuantity(item.quantity, item.unit, dir);
-    if (dir === -1 && item.quantity > 0 && next === 0) {
-      markEmpty.mutate({ householdId, item });
+    // Lê o cache no toque (não a prop): cada toque encadeia no último valor otimista.
+    const current = qc.getQueryData<Item[]>(itemsKey(householdId))?.find((r) => r.id === item.id) ?? item;
+    const next = stepQuantity(current.quantity, current.unit, dir);
+    if (dir === -1 && current.quantity > 0 && next === 0) {
+      markEmpty.mutate({ householdId, item: current });
     } else {
       setQuantity.mutate({ householdId, id: item.id, quantity: next });
     }

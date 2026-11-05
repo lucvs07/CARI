@@ -33,7 +33,7 @@ export function EditItemSheet({
 }
 
 function EditForm({ item, householdId, onClose }: { item: Item; householdId: string; onClose: () => void }) {
-  const update = useUpdateItem();
+  const update = useUpdateItem(item.id);
   const nameId = useId();
   const [name, setName] = useState(item.name);
   const [quantity, setQuantity] = useState(String(item.quantity).replace(".", ","));

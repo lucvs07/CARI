@@ -93,3 +93,21 @@ test("nome duplicado oferece somar quantidade", async ({ page }) => {
   await page.getByRole("button", { name: "Somar" }).click();
   await expect(row(page, "Leite").getByText("3 L")).toBeVisible();
 });
+
+test("toques rápidos com latência não perdem passos", async ({ page }) => {
+  await openEstoque(page);
+  await page.route("**/rest/v1/items*", async (r) => {
+    if (r.request().method() === "PATCH") await new Promise((res) => setTimeout(res, 600));
+    await r.continue();
+  });
+  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Diminuir Leite" }).click();
+  await expect(row(page, "Leite").getByText("0,5 L")).toBeVisible();
+  await page.waitForTimeout(3000);
+  await expect(row(page, "Leite").getByText("0,5 L")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const { data } = await adminClient().from("items").select("quantity, name").eq("name", "Leite").single();
+      return data?.quantity;
+    })
+    .toBe(0.5);
+});

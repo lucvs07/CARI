@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { applyRealtimeEvent, type RealtimeEvent } from "./realtime";
+import { applyRealtimeEvent, shouldSkipRealtime, type RealtimeEvent } from "./realtime";
 
 type Row = { id: string };
 
@@ -19,6 +19,12 @@ export function useHouseholdRealtime(householdId: string): void {
 
     const handler = (key: "items" | "list") => (payload: unknown) => {
       const p = payload as RealtimeEvent<Row>;
+      const pending = qc
+        .getMutationCache()
+        .getAll()
+        .filter((m) => m.state.status === "pending")
+        .map((m) => ({ mutationKey: m.options.mutationKey, variables: m.state.variables }));
+      if (shouldSkipRealtime(pending, key, householdId)) return;
       qc.setQueryData<Row[]>([key, householdId], (rows) => applyRealtimeEvent(rows, p));
     };
 

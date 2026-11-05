@@ -13,6 +13,9 @@ import { MAX_QUANTITY, normalizeName, type Item } from "./schema";
 // Estoque é online-only: sem setMutationDefaults, sem retry automático.
 const MUTATION_KEY = ["items", "write"] as const;
 
+/** Escritas do mesmo item rodam em ordem (scope do TanStack v5). */
+const itemScope = (itemId?: string) => (itemId ? { scope: { id: `item:${itemId}` } } : {});
+
 type Cache = { prev: Item[] | undefined };
 
 async function beginOptimistic(qc: QueryClient, householdId: string, fn: (rows: Item[]) => Item[]): Promise<Cache> {
@@ -56,11 +59,12 @@ function sortedInvalidateBoth(qc: QueryClient, householdId: string) {
   void qc.invalidateQueries({ queryKey: ["list", householdId] });
 }
 
-export function useSetItemQuantity() {
+export function useSetItemQuantity(itemId?: string) {
   const qc = useQueryClient();
   type Vars = { householdId: string; id: string; quantity: number };
   const m = useMutation<void, Error, Vars, Cache>({
     mutationKey: MUTATION_KEY,
+    ...itemScope(itemId),
     retry: false,
     mutationFn: async ({ householdId, id, quantity }) => {
       const { error } = await getBrowserSupabase()
@@ -81,12 +85,13 @@ export function useSetItemQuantity() {
   return m;
 }
 
-export function useMarkEmpty() {
+export function useMarkEmpty(itemId?: string) {
   const qc = useQueryClient();
   type Vars = { householdId: string; item: Item };
   type Result = { hadEntry: boolean };
   const m = useMutation<Result, Error, Vars, Cache>({
     mutationKey: MUTATION_KEY,
+    ...itemScope(itemId),
     retry: false,
     mutationFn: async ({ householdId, item }) => {
       const supabase = getBrowserSupabase();
@@ -183,11 +188,12 @@ function toInsertRow(item: Item) {
   };
 }
 
-export function useRemoveItem() {
+export function useRemoveItem(itemId?: string) {
   const qc = useQueryClient();
   type Vars = { householdId: string; item: Item };
   const m = useMutation<void, Error, Vars, Cache>({
     mutationKey: MUTATION_KEY,
+    ...itemScope(itemId),
     retry: false,
     mutationFn: async ({ householdId, item }) => {
       const { error } = await getBrowserSupabase()
@@ -236,10 +242,11 @@ export type UpsertVars = {
 };
 
 /** Duplicata (23505) não gera toast: o QuickAdd pergunta se soma. */
-export function useUpsertItem() {
+export function useUpsertItem(itemId?: string) {
   const qc = useQueryClient();
   const m = useMutation<void, Error, UpsertVars, Cache>({
     mutationKey: MUTATION_KEY,
+    ...itemScope(itemId),
     retry: false,
     mutationFn: async ({ householdId, name, quantity, unit, category, existingId, id }) => {
       const supabase = getBrowserSupabase();
@@ -312,10 +319,11 @@ export type UpdateVars = {
   category: Category;
 };
 
-export function useUpdateItem() {
+export function useUpdateItem(itemId?: string) {
   const qc = useQueryClient();
   const m = useMutation<void, Error, UpdateVars, Cache>({
     mutationKey: MUTATION_KEY,
+    ...itemScope(itemId),
     retry: false,
     mutationFn: async ({ householdId, id, name, quantity, unit, category }) => {
       const { error } = await getBrowserSupabase()
