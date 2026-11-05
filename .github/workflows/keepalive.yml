@@ -1,0 +1,29 @@
+name: Keepalive
+
+# O free tier do Supabase pausa projetos sem atividade. Uma chamada por semana evita a pausa.
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      # anon não lê nenhuma tabela (o REST devolveria 401): o ping é a RPC public.ping(), que só
+      # devolve 1 e passa pela API e pelo banco. Falha (-f) se a resposta não for 2xx.
+      - name: Chamar public.ping()
+        run: |
+          curl -fsS -o /dev/null --retry 3 --retry-delay 10 -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'

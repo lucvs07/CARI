@@ -1,0 +1,54 @@
+name: Migrations
+
+# Só depois do CI verde no main: o commit que vai para o banco hospedado passou pelos testes
+# (pgTAP + E2E) antes. O workflow_run não tem filtro de paths, então este job roda a cada push
+# verde no main — e tudo bem: `db push` só aplica as migrations que ainda não estão no histórico
+# remoto (sem nada novo, não muda nada).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    # CI verde de um push no main deste repositório (um PR de fork com branch "main" não conta).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      # CLI 3.0: mudanças no projeto hospedado exigem consentimento explícito (sem TTY no CI)
+      SUPABASE_YES: "1"
+    steps:
+      # O commit que o CI testou (no workflow_run o checkout padrão seria o último do main).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Vincular ao projeto
+        run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF" --yes
+
+      - name: Aplicar migrations
+        run: npx supabase db push --remote --yes
