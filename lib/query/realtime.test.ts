@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { applyRealtimeEvent } from "./realtime";
+import { applyRealtimeEvent, keysToRefetchOnReconnect } from "./realtime";
 
 const a = { id: "a", name: "Leite" },
   b = { id: "b", name: "Pão" };
@@ -43,4 +43,11 @@ test("shouldSkipRealtime só pula com mutação pendente da mesma chave e casa",
   expect(shouldSkipRealtime(pending, "list", "h1")).toBe(false);
   expect(shouldSkipRealtime([], "items", "h1")).toBe(false);
   expect(shouldSkipRealtime([{ mutationKey: ["list", "x"], variables: { householdId: "h1" } }], "list", "h1")).toBe(true);
+});
+
+test("reconexão: com escrita da lista na fila, só o estoque é buscado de novo", () => {
+  expect(keysToRefetchOnReconnect([])).toEqual(["items", "list"]);
+  expect(keysToRefetchOnReconnect([{ mutationKey: ["items", "write"] }])).toEqual(["items", "list"]);
+  expect(keysToRefetchOnReconnect([{ mutationKey: ["list", "setChecked"], variables: { householdId: "h1" } }])).toEqual(["items"]);
+  expect(keysToRefetchOnReconnect([{ mutationKey: ["finish"] }])).toEqual(["items", "list"]);
 });

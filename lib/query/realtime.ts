@@ -1,3 +1,5 @@
+import { isListWriteKey } from "@/features/shopping/model";
+
 export type RealtimeEvent<T> = {
   eventType: "INSERT" | "UPDATE" | "DELETE";
   new: Partial<T>;
@@ -43,4 +45,13 @@ export function shouldSkipRealtime(pending: PendingMutation[], key: string, hous
       m.mutationKey?.[0] === key &&
       (m.variables as { householdId?: unknown } | undefined)?.householdId === householdId,
   );
+}
+
+/**
+ * Caches buscados de novo quando o canal reconecta. A lista fica de fora enquanto houver escrita da
+ * lista na fila (como no settle): o refetch traria o servidor sem as marcações ainda não enviadas.
+ */
+export function keysToRefetchOnReconnect(pending: PendingMutation[]): ("items" | "list")[] {
+  const listBusy = pending.some((m) => isListWriteKey(m.mutationKey));
+  return listBusy ? ["items"] : ["items", "list"];
 }

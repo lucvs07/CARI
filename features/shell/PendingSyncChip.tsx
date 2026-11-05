@@ -5,7 +5,7 @@ import { useMutationState } from "@tanstack/react-query";
 import { CloudOffIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cari } from "@/features/cari/messages";
-import { countPausedListWrites } from "@/features/shopping/model";
+import { countPausedListWrites, isListWriteKey } from "@/features/shopping/model";
 import { useOnlineStatus } from "@/lib/query/useOnlineStatus";
 
 /** "n alterações aguardando sinal": escritas da lista pausadas sem rede; some quando a fila sincroniza. */
@@ -17,16 +17,18 @@ export function PendingSyncChip() {
   });
   // Online, "pausada" só significa esperando a vez no scope da lista (transitório).
   const n = online ? 0 : countPausedListWrites(pending);
+  const queued = pending.filter((m) => isListWriteKey(m.mutationKey)).length;
   const announced = useRef(false);
 
   useEffect(() => {
-    if (online) {
+    // Sinal fraco alterna online/offline a cada sonda: o aviso sai uma vez por fila, não a cada volta.
+    if (queued === 0) {
       announced.current = false;
     } else if (n > 0 && !announced.current) {
       announced.current = true;
       toast(cari.offlineQueued);
     }
-  }, [online, n]);
+  }, [queued, n]);
 
   if (n === 0) return null;
   return (

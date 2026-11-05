@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { cari } from "@/features/cari/messages";
 import { itemsKey } from "@/features/inventory/queries";
 import { toCariError } from "@/lib/errors";
+import { goOffline, isNetworkError, NetworkError, throwIfError } from "@/lib/query/network";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import {
   applyListWrite,
@@ -37,6 +38,31 @@ export type { EntryInput, RemoveEntryVars, SetCheckedVars, SetEntryQuantityVars,
 type Ctx = { prev: Entry | undefined };
 
 const LIST_SCOPE = { id: "list" };
+
+/** Espera antes de pausar depois de uma falha de rede (o app já foi marcado offline). */
+export const NETWORK_RETRY_DELAY_MS = 1_000;
+
+/*
+ * Falha de rede (sem resposta HTTP) não é erro da escrita: as escritas são idempotentes, então a
+ * mutação tenta de novo sem limite — com o app marcado offline ela pausa, é persistida e volta
+ * quando a rede voltar. Erro com resposta (RLS, validação) segue o caminho de sempre: 3 tentativas,
+ * rollback e toast.
+ */
+const LIST_RETRY = {
+  retry: (failureCount: number, err: Error) => isNetworkError(err) || failureCount < 3,
+  retryDelay: (failureCount: number, err: Error) =>
+    isNetworkError(err) ? NETWORK_RETRY_DELAY_MS : Math.min(1000 * 2 ** failureCount, 30_000),
+};
+
+/** Roda a escrita; falha de rede marca o app offline antes de o retryer decidir (então ele pausa). */
+async function listWrite(run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    if (isNetworkError(err)) goOffline();
+    throw err;
+  }
+}
 
 function patchList(qc: QueryClient, householdId: string, fn: (rows: Entry[]) => Entry[]) {
   qc.setQueryData<Entry[]>(listKey(householdId), (rows) => (rows ? fn(rows) : rows));
@@ -98,9 +124,10 @@ function entriesTable() {
 export function registerListMutationDefaults(qc: QueryClient): void {
   qc.setMutationDefaults<void, Error, UpsertEntryVars, Ctx>(listMutationKey("upsert"), {
     scope: LIST_SCOPE,
-    mutationFn: async ({ householdId, entry, userId }) => {
+    ...LIST_RETRY,
+    mutationFn: ({ householdId, entry, userId }) => listWrite(async () => {
       const { checked, added_by, ...fields } = entry;
-      const { error } = await entriesTable().upsert(
+      const res = await entriesTable().upsert(
         {
           ...fields,
           household_id: householdId,
@@ -110,8 +137,8 @@ export function registerListMutationDefaults(qc: QueryClient): void {
         { onConflict: "id" },
       );
       // Item do estoque que outro aparelho já pôs na lista (índice único em item_id): a entrada existe, ok.
-      if (error && !(error.code === "23505" && entry.item_id)) throw error;
-    },
+      if (res.error && !(res.error.code === "23505" && entry.item_id)) throwIfError(res);
+    }),
     onMutate: (vars) => {
       const now = new Date().toISOString();
       return beginOptimistic(qc, vars.householdId, vars.entry.id, (rows) => patchUpsert(rows, vars, now));
@@ -125,13 +152,15 @@ export function registerListMutationDefaults(qc: QueryClient): void {
 
   qc.setMutationDefaults<void, Error, SetCheckedVars, Ctx>(listMutationKey("setChecked"), {
     scope: LIST_SCOPE,
-    mutationFn: async ({ householdId, id, checked, userId }) => {
-      const { error } = await entriesTable()
-        .update({ checked, checked_by: checked ? (userId ?? null) : null })
-        .eq("id", id)
-        .eq("household_id", householdId);
-      if (error) throw error;
-    },
+    ...LIST_RETRY,
+    mutationFn: ({ householdId, id, checked, userId }) => listWrite(async () => {
+      throwIfError(
+        await entriesTable()
+          .update({ checked, checked_by: checked ? (userId ?? null) : null })
+          .eq("id", id)
+          .eq("household_id", householdId),
+      );
+    }),
     onMutate: (vars) => beginOptimistic(qc, vars.householdId, vars.id, (rows) => patchSetChecked(rows, vars)),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
@@ -142,10 +171,10 @@ export function registerListMutationDefaults(qc: QueryClient): void {
 
   qc.setMutationDefaults<void, Error, SetEntryQuantityVars, Ctx>(listMutationKey("setQuantity"), {
     scope: LIST_SCOPE,
-    mutationFn: async ({ householdId, id, quantity }) => {
-      const { error } = await entriesTable().update({ quantity }).eq("id", id).eq("household_id", householdId);
-      if (error) throw error;
-    },
+    ...LIST_RETRY,
+    mutationFn: ({ householdId, id, quantity }) => listWrite(async () => {
+      throwIfError(await entriesTable().update({ quantity }).eq("id", id).eq("household_id", householdId));
+    }),
     onMutate: (vars) => beginOptimistic(qc, vars.householdId, vars.id, (rows) => patchSetQuantity(rows, vars)),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
@@ -156,11 +185,11 @@ export function registerListMutationDefaults(qc: QueryClient): void {
 
   qc.setMutationDefaults<void, Error, RemoveEntryVars, Ctx>(listMutationKey("remove"), {
     scope: LIST_SCOPE,
+    ...LIST_RETRY,
     // Remover o que já foi removido (0 linhas) é sucesso.
-    mutationFn: async ({ householdId, id }) => {
-      const { error } = await entriesTable().delete().eq("id", id).eq("household_id", householdId);
-      if (error) throw error;
-    },
+    mutationFn: ({ householdId, id }) => listWrite(async () => {
+      throwIfError(await entriesTable().delete().eq("id", id).eq("household_id", householdId));
+    }),
     onMutate: (vars) => beginOptimistic(qc, vars.householdId, vars.id, (rows) => patchRemove(rows, vars)),
     onError: (err, vars, ctx) => {
       rollback(qc, vars.householdId, vars.id, ctx);
@@ -207,17 +236,42 @@ export function useRemoveEntry() {
 
 export type FinishVars = { householdId: string; entries: { entry_id: string; quantity: number }[] };
 
-/** Espera a fila da lista esvaziar: finish_shopping exige que as marcações já estejam no banco. */
+/**
+ * Espera a fila da lista esvaziar: finish_shopping exige que as marcações já estejam no banco.
+ * Offline (fila pausada) não adianta esperar.
+ */
 async function waitForListWrites(qc: QueryClient, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs;
-  while (pendingListWrites(qc) > 0 && Date.now() < deadline) {
+  while (pendingListWrites(qc) > 0 && onlineManager.isOnline() && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 100));
   }
 }
 
 /**
+ * Corpo do "Guardar no estoque". Com marcações ainda na fila (sem sinal) o RPC nem é chamado: as
+ * entradas não estariam marcadas no banco e o `entry_invalid` viraria um falso "já guardaram".
+ */
+export async function finishShopping(qc: QueryClient, { householdId, entries }: FinishVars): Promise<number> {
+  await waitForListWrites(qc);
+  if (pendingListWrites(qc) > 0 || !onlineManager.isOnline()) throw new NetworkError("list_pending");
+  const res = await getBrowserSupabase().rpc("finish_shopping", {
+    p_household_id: householdId,
+    p_entries: entries,
+  });
+  if (res.error && res.status === 0) goOffline();
+  throwIfError(res);
+  return res.data ?? 0;
+}
+
+/** Erro do "Guardar no estoque" → fala da Cari. Falha de rede nunca vira "já guardaram". */
+export function finishErrorMessage(err: unknown): string {
+  if (isNetworkError(err)) return cari.finishNeedsNetwork;
+  return toCariError(err) === "alreadyFinished" ? cari.alreadyFinished : cari.genericError;
+}
+
+/**
  * Exige conexão: fora da fila offline (chave fora de "list", networkMode "always" para nunca pausar
- * e ser persistida sem mutationFn registrada).
+ * e ser persistida sem mutationFn registrada). Não é idempotente: sem retry.
  */
 export function useFinishShopping() {
   const qc = useQueryClient();
@@ -225,15 +279,7 @@ export function useFinishShopping() {
     mutationKey: ["finish"],
     networkMode: "always",
     retry: false,
-    mutationFn: async ({ householdId, entries }) => {
-      await waitForListWrites(qc);
-      const { data, error } = await getBrowserSupabase().rpc("finish_shopping", {
-        p_household_id: householdId,
-        p_entries: entries,
-      });
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (vars) => finishShopping(qc, vars),
     onSuccess: (n, { householdId, entries }) => {
       const done = new Set(entries.map((e) => e.entry_id));
       patchList(qc, householdId, (rows) => rows.filter((r) => !done.has(r.id)));
@@ -242,10 +288,8 @@ export function useFinishShopping() {
       void qc.invalidateQueries({ queryKey: listKey(householdId) });
     },
     onError: (err, { householdId }) => {
-      const key = toCariError(err);
-      if (key === "alreadyFinished") toast.error(cari.alreadyFinished);
-      else toast.error(cari.genericError);
-      void qc.invalidateQueries({ queryKey: listKey(householdId) });
+      toast.error(finishErrorMessage(err));
+      if (!isNetworkError(err)) void qc.invalidateQueries({ queryKey: listKey(householdId) });
     },
   });
 }
