@@ -20,6 +20,12 @@ export const cari = {
   magicLinkSent: "Te mandei um link! Confere seu e-mail.",
   movedToList: (name: string) => `${name} foi para a lista`,
   removed: "Removido",
+  itemNameRequired: "Dá um nome para o item.",
+  itemNameTooLong: "Use até 80 caracteres.",
+  quantityInvalid: "Informe uma quantidade válida, como 1 ou 1,5.",
+  quantityTooLarge: "Essa quantidade é grande demais.",
+  inventoryNoResults: "Nenhum item com esse nome.",
+  inventoryOffline: "Sem internet: o estoque volta quando o sinal voltar.",
   pendingSync: (n: number) =>
     n === 1 ? "1 alteração aguardando sinal" : `${n} alterações aguardando sinal`,
 } as const;
