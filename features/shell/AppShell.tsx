@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ClaimLocalData } from "@/lib/query/userGate";
 import { BottomTabs } from "./BottomTabs";
 import { CurrentUserProvider } from "./CurrentUser";
 import { HouseholdSwitcher } from "./HouseholdSwitcher";
@@ -18,6 +19,7 @@ export function AppShell({
 }) {
   return (
     <CurrentUserProvider userId={user.id}>
+      <ClaimLocalData userId={user.id} />
       <div className="flex min-h-dvh flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b bg-background px-2 py-1">
           <HouseholdSwitcher userId={user.id} currentId={householdId} households={households} />

@@ -25,6 +25,16 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     },
   );
 
-  await supabase.auth.getUser();
+  const { data } = await supabase.auth.getUser();
+
+  // Já logado: /login não troca de conta por cima da sessão atual (Sair primeiro).
+  if (data.user && request.nextUrl.pathname === "/login") {
+    const home = request.nextUrl.clone();
+    home.pathname = "/";
+    home.search = "";
+    const redirect = NextResponse.redirect(home);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  }
   return response;
 }

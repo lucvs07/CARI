@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,37 +13,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LISTA_CACHE } from "@/features/pwa/cacheNames";
-import { forgetLastHousehold } from "@/features/pwa/lastHousehold";
-import { clearPersistedCache, persister } from "@/lib/query/persist";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { clearLocalUserData, type LocalDataClient } from "./localData";
 import { ThemeToggle } from "./ThemeToggle";
 
 type SignOutDeps = {
-  queryClient: Pick<QueryClient, "cancelQueries" | "clear">;
+  queryClient: LocalDataClient;
   navigate: () => void;
 };
 
-/** Ordem importa: encerra a sessão antes de limpar, para nenhum refetch repopular o cache do usuário anterior. */
+/** Sem rede o signOut local pode esperar o lock/refresh da sessão: "Sair" nunca trava por isso. */
+export const SIGN_OUT_TIMEOUT_MS = 3_000;
+
+/**
+ * Ordem importa: encerra a sessão antes de limpar, para nenhum refetch repopular o cache do usuário
+ * anterior. Cada passo é independente; a limpeza e a navegação acontecem sempre.
+ */
 export async function signOut({ queryClient, navigate }: SignOutDeps) {
   try {
-    await getBrowserSupabase().auth.signOut({ scope: "local" });
+    await Promise.race([
+      getBrowserSupabase().auth.signOut({ scope: "local" }),
+      new Promise((resolve) => setTimeout(resolve, SIGN_OUT_TIMEOUT_MS)),
+    ]);
   } catch {
     // segue limpando e saindo mesmo assim
+  }
+  try {
+    await clearLocalUserData(queryClient);
   } finally {
-    try {
-      await queryClient.cancelQueries();
-      queryClient.clear();
-      await persister.removeClient();
-      await clearPersistedCache();
-      forgetLastHousehold();
-      if (typeof window !== "undefined" && "caches" in window) await caches.delete(LISTA_CACHE);
-    } catch {
-      // limpeza falhou: nunca bloqueia o logout
-    } finally {
-      queryClient.clear();
-      navigate();
-    }
+    navigate();
   }
 }
 

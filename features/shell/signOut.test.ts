@@ -59,3 +59,30 @@ test("segue limpando e navega se auth.signOut falhar", async () => {
   expect(mocks.clearPersisted).toHaveBeenCalled();
   expect(navigate).toHaveBeenCalledOnce();
 });
+
+test("offline: signOut pendurado não trava o Sair (prazo de 3 s), limpa e navega", async () => {
+  vi.useFakeTimers();
+  try {
+    mocks.authSignOut.mockImplementation(() => new Promise(() => {}));
+    const done = signOut({ queryClient: qc, navigate });
+    await vi.advanceTimersByTimeAsync(3_000);
+    await done;
+    expect(mocks.clearPersisted).toHaveBeenCalled();
+    expect(mocks.cachesDelete).toHaveBeenCalledWith("cari-lista");
+    expect(navigate).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("cada passo da limpeza é independente: cancelQueries falhar não impede o resto", async () => {
+  qc.cancelQueries.mockRejectedValueOnce(new Error("boom"));
+  mocks.removeClient.mockRejectedValueOnce(new Error("idb"));
+  localStorage.setItem("cari-last-household", "h1");
+  await signOut({ queryClient: qc, navigate });
+  expect(qc.clear).toHaveBeenCalledTimes(2);
+  expect(mocks.clearPersisted).toHaveBeenCalled();
+  expect(mocks.cachesDelete).toHaveBeenCalledWith("cari-lista");
+  expect(localStorage.getItem("cari-last-household")).toBeNull();
+  expect(navigate).toHaveBeenCalledOnce();
+});
