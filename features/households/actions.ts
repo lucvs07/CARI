@@ -22,7 +22,9 @@ export type ActionError = { error: CariErrorKey };
 export async function renameHousehold(id: string, name: string): Promise<{ ok: true } | ActionError> {
   await requireUser();
   const parsed = nameSchema.safeParse(name);
-  if (!parsed.success) return { error: "genericError" };
+  if (!parsed.success) {
+    return { error: name.trim().length > 60 ? "houseNameTooLong" : "houseNameRequired" };
+  }
   const supabase = await createServerSupabase();
   // RLS: só owner altera; sem permissão nenhuma linha é tocada.
   const { data, error } = await supabase.from("households").update({ name: parsed.data }).eq("id", id).select("id");
@@ -74,7 +76,9 @@ export async function setMemberRole(
 }
 
 export async function removeMember(householdId: string, userId: string): Promise<{ ok: true } | ActionError> {
-  await requireUser();
+  const user = await requireUser();
+  // Sair da casa passa por leaveHousehold (regras de leave_household).
+  if (userId === user.id) return { error: "genericError" };
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from("household_members")

@@ -1,6 +1,6 @@
 import { cari } from "@/features/cari/messages";
 
-export type CariErrorKey = "inviteInvalid" | "inviteExpired" | "lastOwner" | "alreadyFinished" | "duplicateItem" | "genericError";
+export type CariErrorKey = "houseNameRequired" | "houseNameTooLong" | "inviteInvalid" | "inviteExpired" | "lastOwner" | "alreadyFinished" | "duplicateItem" | "genericError";
 
 // Garante em tempo de compilação que toda chave existe em `cari`.
 export type _CariKeysExist = Pick<typeof cari, CariErrorKey>;

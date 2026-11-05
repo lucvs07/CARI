@@ -15,9 +15,24 @@ import {
 import { CariSays } from "@/features/cari/CariSays";
 import { cari } from "@/features/cari/messages";
 import { cariErrorMessage } from "@/lib/errors";
-import { forgetLastHousehold } from "@/features/pwa/lastHousehold";
+import { LISTA_CACHE } from "@/features/pwa/cacheNames";
+import { forgetLastHousehold, lastListaHref } from "@/features/pwa/lastHousehold";
 import type { CariErrorKey } from "@/lib/errors";
 import { leaveHousehold } from "./actions";
+
+/** Tira do cache do SW as respostas da Lista da casa que a pessoa deixou. */
+async function dropListaCache(householdId: string): Promise<void> {
+  try {
+    if (typeof window === "undefined" || !("caches" in window)) return;
+    const cache = await caches.open(LISTA_CACHE);
+    const prefix = `/${householdId}/lista`;
+    for (const req of await cache.keys()) {
+      if (new URL(req.url).pathname === prefix) await cache.delete(req);
+    }
+  } catch {
+    // limpeza é best-effort: sair da casa já deu certo
+  }
+}
 
 export function LeaveHouseholdButton({ householdId, householdName }: { householdId: string; householdName: string }) {
   const router = useRouter();
@@ -35,7 +50,8 @@ export function LeaveHouseholdButton({ householdId, householdName }: { household
           setOpen(false);
           return;
         }
-        forgetLastHousehold();
+        if (lastListaHref() === `/${householdId}/lista`) forgetLastHousehold();
+        await dropListaCache(householdId);
         queryClient.removeQueries({ queryKey: ["items", householdId] });
         queryClient.removeQueries({ queryKey: ["list", householdId] });
         queryClient.removeQueries({ queryKey: ["members", householdId] });
@@ -65,11 +81,11 @@ export function LeaveHouseholdButton({ householdId, householdName }: { household
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Sair da casa?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle>
               {cari.leaveConfirmPrefix} <em>{householdName}</em>
               {cari.leaveConfirmSuffix}
-            </DialogDescription>
+            </DialogTitle>
+            <DialogDescription>{cari.leaveConfirmDetail}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>

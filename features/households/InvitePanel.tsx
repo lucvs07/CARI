@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Link2, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,10 @@ export function InvitePanel({
   const [invite, setInvite] = useState<ActiveInvite | null>(initialInvite);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [welcome] = useState(novo); // sobrevive à remoção do ?novo=1 da URL
   const autoStarted = useRef(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
   function generate() {
     setError(null);
@@ -32,7 +36,11 @@ export function InvitePanel({
       try {
         const res = await createInvite(householdId);
         if ("error" in res) setError(cariErrorMessage(res.error));
-        else setInvite(res);
+        else {
+          setInvite(res);
+          // A fala de boas-vindas vale só uma vez: não volta ao revisitar a URL.
+          if (novo) router.replace(pathname, { scroll: false });
+        }
       } catch {
         setError(cari.genericError);
       }
@@ -83,7 +91,7 @@ export function InvitePanel({
       <h2 id="convite-titulo" className="text-lg font-semibold">
         Convite
       </h2>
-      {novo && invite && <CariSays message={cari.houseCreated} live />}
+      {welcome && invite && <CariSays message={cari.houseCreated} live />}
       {invite ? (
         <>
           <Input readOnly aria-label="Link de convite" value={invite.url} onFocus={(e) => e.currentTarget.select()} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MoreVertical } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +30,10 @@ export function MembersList({
   const queryClient = useQueryClient();
   const { data } = useMembers(householdId, initialMembers);
   const members = data ?? initialMembers;
+  // O snapshot do servidor é o mais fresco: vence um ['members', id] já em cache (da Lista ou do IndexedDB).
+  useEffect(() => {
+    queryClient.setQueryData(membersKey(householdId), initialMembers);
+  }, [queryClient, householdId, initialMembers]);
   const [busy, setBusy] = useState(false);
   const isOwner = members.some((m) => m.user_id === currentUserId && m.role === "owner");
 

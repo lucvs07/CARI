@@ -1,4 +1,5 @@
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
+import { entry, waitForHydration } from "./helpers/app";
 import { authStatePath } from "./helpers/auth";
 import { A1, adminClient, resetFixture } from "./helpers/db";
 
@@ -101,4 +102,21 @@ test("owner promove e remove membro; renomeia a casa", async ({ browser }) => {
   await lucas.getByRole("button", { name: "Ações de Ana" }).click();
   await lucas.getByRole("menuitem", { name: "Remover" }).click();
   await expect(lucas.getByRole("button", { name: "Ações de Ana" })).toHaveCount(0);
+});
+
+test("/casa mostra quem entrou depois de o cache de membros já existir", async ({ browser }) => {
+  const lucas = await pageFor(browser, "lucas@cari.test");
+  await lucas.goto(`/${A1}/lista`);
+  await waitForHydration(lucas);
+  await expect(entry(lucas, "Arroz")).toBeVisible();
+  // Impede o Realtime de entregar a mudança: o /casa precisa vencer o cache sozinho.
+  await lucas.context().setOffline(true);
+  const { error } = await adminClient()
+    .from("household_members")
+    .insert({ household_id: A1, user_id: "00000000-0000-0000-0000-0000000000b5", role: "member" });
+  if (error) throw error;
+  await lucas.context().setOffline(false);
+  await lucas.getByRole("button", { name: "Menu da conta" }).click();
+  await lucas.getByRole("menuitem", { name: "Gerenciar casa" }).click();
+  await expect(lucas.getByText("Convidado", { exact: true })).toBeVisible();
 });
