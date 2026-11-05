@@ -1,4 +1,4 @@
-import type { cari } from "@/features/cari/messages";
+import { cari } from "@/features/cari/messages";
 
 export type CariErrorKey = "inviteInvalid" | "inviteExpired" | "lastOwner" | "alreadyFinished" | "duplicateItem" | "genericError";
 
@@ -14,4 +14,9 @@ export function toCariError(err: unknown): CariErrorKey {
   if (message.includes("entry_invalid")) return "alreadyFinished";
   if (e.code === "23505") return "duplicateItem";
   return "genericError";
+}
+
+/** Texto da Cari para uma chave de erro (mensagens com parâmetro caem no genérico). */
+export function cariErrorMessage(key: CariErrorKey): string {
+  return key === "duplicateItem" ? cari.genericError : cari[key];
 }

@@ -13,7 +13,9 @@ test("usuário sem casa cria a primeira", async ({ page }) => {
   await page.getByLabel("Nome da casa").fill("Casa do Novo");
   await page.getByRole("button", { name: "Criar casa" }).click();
   await expect(page.getByRole("button", { name: /Casa do Novo/ })).toBeVisible();
-  await expect(page).toHaveURL(/\/lista/);
+  await expect(page).toHaveURL(/\/casa\?novo=1/);
+  await expect(page.getByText("Casa criada! Manda esse link pra quem mora com você.")).toBeVisible();
+  await expect(page.getByLabel("Link de convite")).toHaveValue(/\/convite\/.+/);
 });
 
 test("AppShell: abas com aria-current e receitas com a Cari", async ({ page }) => {

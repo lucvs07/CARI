@@ -28,8 +28,7 @@ export function CreateHouseholdForm() {
     start(async () => {
       try {
         const { id } = await createHousehold(parsed.data);
-        // Tarefa 13 troca o destino por /[id]/casa?novo=1 (convite).
-        router.push(`/${id}/lista`);
+        router.push(`/${id}/casa?novo=1`);
       } catch {
         setError(cari.genericError);
       }
