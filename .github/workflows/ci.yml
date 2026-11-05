@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint, tipos e testes unitários
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      # Exclui só o que os testes não usam (Studio, imgproxy, edge runtime, logs, pooler).
+      # Mantém db, auth, rest, realtime, storage e mailpit (o login E2E lê o magic link no Mailpit).
+      - name: Subir o Supabase local
+        run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
+
+      - name: Testes do banco (pgTAP)
+        run: npm run db:test
+
+      # Só as 2 envs públicas vão para o build do front; a service role local é lida pelos
+      # helpers do E2E direto de `supabase status` e nunca é exportada.
+      - name: Exportar as envs públicas do Supabase local
+        run: |
+          status="$(npx supabase status -o env)"
+          url="$(printf '%s\n' "$status" | sed -n 's/^API_URL="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p')"
+          anon="$(printf '%s\n' "$status" | sed -n 's/^ANON_KEY="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p')"
+          test -n "$url" && test -n "$anon"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$url" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon" >> "$GITHUB_ENV"
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run db:reset
+
+      - name: Testes E2E
+        run: npm run test:e2e
+
+      - name: Enviar o relatório do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
