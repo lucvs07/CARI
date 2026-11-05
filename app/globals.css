@@ -7,9 +7,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-chillax), ui-sans-serif, system-ui, sans-serif;
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-surface: var(--surface);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-variant: var(--surface-variant);
+  --color-on-surface: var(--on-surface);
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,73 +55,86 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Tokens da spec §9 (base Material 3). Valores hex = fonte da verdade. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --primary: #006b5c;
+  --on-primary: #ffffff;
+  --primary-hover: #147769;
+  --secondary: #4a635d;
+  --surface: #f8faf7;
+  --surface-container-low: #f2f4f2;
+  --surface-variant: #dae5e1;
+  --on-surface: #191c1b;
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  color-scheme: light;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --primary: #58dbc3;
+  --on-primary: #00382f;
+  --primary-hover: #51ceb8;
+  --secondary: #b1ccc4;
+  --surface: #101413;
+  --surface-container-low: #191c1b;
+  --surface-variant: #3f4946;
+  --on-surface: #c4c7c5;
+  --error: #ffb4ab;
+  --on-error: #690005;
+  color-scheme: dark;
+}
+
+/* Sem JS (ou antes do script de tema), segue o sistema. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --primary: #58dbc3;
+    --on-primary: #00382f;
+    --primary-hover: #51ceb8;
+    --secondary: #b1ccc4;
+    --surface: #101413;
+    --surface-container-low: #191c1b;
+    --surface-variant: #3f4946;
+    --on-surface: #c4c7c5;
+    --error: #ffb4ab;
+    --on-error: #690005;
+    color-scheme: dark;
+  }
+}
+
+/* Mapeamento para as variáveis do shadcn/ui. */
+:root,
+.dark,
+:root:not(.light):not(.dark) {
+  --background: var(--surface);
+  --foreground: var(--on-surface);
+  --card: var(--surface-container-low);
+  --card-foreground: var(--on-surface);
+  --popover: var(--surface-container-low);
+  --popover-foreground: var(--on-surface);
+  --primary-foreground: var(--on-primary);
+  --secondary-foreground: var(--on-primary);
+  --muted: var(--surface-container-low);
+  --muted-foreground: var(--secondary);
+  --accent: var(--surface-variant);
+  --accent-foreground: var(--on-surface);
+  --destructive: var(--error);
+  --border: var(--surface-variant);
+  --input: var(--surface-variant);
+  --ring: var(--primary);
+  --chart-1: var(--primary);
+  --chart-2: var(--secondary);
+  --chart-3: var(--primary-hover);
+  --chart-4: var(--surface-variant);
+  --chart-5: var(--error);
+  --radius: 0.75rem;
+  --sidebar: var(--surface-container-low);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-accent: var(--surface-variant);
+  --sidebar-accent-foreground: var(--on-surface);
+  --sidebar-border: var(--surface-variant);
+  --sidebar-ring: var(--primary);
 }
 
 @layer base {
@@ -126,5 +146,25 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Chillax só em destaques: títulos, botões e quantidades (spec §9/§13). */
+  h1,
+  h2,
+  h3,
+  button,
+  [role="button"],
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

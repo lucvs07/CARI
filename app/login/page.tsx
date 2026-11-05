@@ -5,10 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cari } from "@/features/cari/messages";
 import { safeNext } from "@/lib/auth/next";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-
-const LINK_SENT = "Te mandei um link! Confere seu e-mail.";
 
 function LoginForm() {
   const params = useSearchParams();
@@ -61,7 +60,7 @@ function LoginForm() {
           Receber link por e-mail
         </Button>
       </form>
-      {sent && <p role="status">{LINK_SENT}</p>}
+      {sent && <p role="status">{cari.magicLinkSent}</p>}
       {error && <p role="alert" className="text-destructive">{error}</p>}
     </main>
   );

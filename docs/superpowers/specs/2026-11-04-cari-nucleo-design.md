@@ -316,5 +316,5 @@ Base também para o prompt da IA (subprojeto 2) e do bot (subprojeto 4).
 
 ## 13. Decisões em aberto (com critério definido)
 
-- **Chillax no corpo de texto:** decidida no protótipo, pelo critério da seção 9.
+- **Chillax no corpo de texto:** decidido (Tarefa 8, protótipo a 375 px, 14/16 px, pesos 400/500): **não** usar no corpo. O "I" maiúsculo e o "l" minúsculo são idênticos ("Iogurte" lê como "logurte") e o 400 é fino a 14 px; o corpo usa **Inter** (`next/font/google`) e a Chillax fica em títulos (h1–h3), botões e quantidades.
 - **Variações de ilustração da Cari:** fora do núcleo; usar a pose atual até existirem.
