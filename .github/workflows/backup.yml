@@ -1,0 +1,52 @@
+name: Backup
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Usa a versão do CLI travada no package-lock, não a última do npm
+      - run: npm ci
+
+      - name: Instalar o age
+        run: sudo apt-get update && sudo apt-get install -y age
+
+      # O repositório é público: o dump em texto puro nunca pode virar artefato nem log.
+      # O dump de dados já inclui auth.users, então o restore não deixa perfis órfãos.
+      # Fica de fora o que é efêmero ou sensível e não tem valor num restore: sessões, refresh tokens,
+      # fluxos PKCE, log de auditoria, tokens de uso único e claims de MFA. users/identities ficam.
+      - name: Gerar o dump e criptografar
+        run: |
+          set -euo pipefail
+          trap 'rm -f dump.sql' EXIT
+          npx supabase db dump --remote="$SUPABASE_DB_URL" --data-only \
+            -x auth.sessions,auth.refresh_tokens,auth.flow_state,auth.audit_log_entries,auth.one_time_tokens,auth.mfa_amr_claims \
+            -f dump.sql > /dev/null
+          age -r "$BACKUP_AGE_PUBLIC_KEY" -o dump.sql.age dump.sql
+          test -s dump.sql.age
+
+      - name: Enviar o backup criptografado
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-criptografado
+          path: dump.sql.age
+          if-no-files-found: error
+          retention-days: 90
